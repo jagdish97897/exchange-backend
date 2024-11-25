@@ -79,19 +79,35 @@ const register = asyncHandler(async (req, res) => {
                 await User.create({ fullName, phoneNumber, type, aadharNumber, panNumber, profileImage });
                 return res.status(201).json({ message: "User registered successfully" });
 
-            case 'driver':
-                validateFields([fullName, phoneNumber, type, aadharNumber, panNumber, dlNumber, dob]);
-                // await verifyAadharAndPAN(aadharNumber, panNumber, fullName, dob, gender, phoneNumber);
-                // await drivingLicenceVerification(dlnumber, dob);
-                await User.create({ fullName, phoneNumber, type, aadharNumber, panNumber, dlNumber, profileImage });
-                return res.status(201).json({ message: "User registered successfully" });
+                case 'driver':
+                    // Make sure to include `dob` and `gender` in the validateFields function
+                    validateFields([fullName, phoneNumber, type, aadharNumber, panNumber, dlNumber, dob, gender]);
+                
+                    // You can also add further verification here for Aadhar, PAN, or Driving License if needed.
+                    // await verifyAadharAndPAN(aadharNumber, panNumber, fullName, dob, gender, phoneNumber);
+                    // await drivingLicenceVerification(dlNumber, dob);
+                
+                    // Create the driver user with all required fields, including `dob` and `gender`
+                    await User.create({
+                        fullName,
+                        phoneNumber,
+                        type,
+                        aadharNumber,
+                        panNumber,
+                        dlNumber,
+                        profileImage,
+                        dob,
+                        gender 
+                    });
+                
+                    return res.status(201).json({ message: "User registered successfully" });
+                
 
             default:
                 throw new ApiError(400, "User type not found");
         }
 
     } catch (error) {
-        // console.log('Error in register:', error.message);
         throw new ApiError(400, error.message);
     }
 });
@@ -235,74 +251,143 @@ const getUserByPhoneNumber = asyncHandler(async (req, res) => {
     }
 });
 
+// const updateUserByPhoneNumber = asyncHandler(async (req, res) => {
+//     try {
+//         const { phoneNumber, fullName, profileImage, email, gstin, type, companyName, website, aadharNumber, panNumber, dob, gender, dlNumber } = req.body;
+
+//         // Check if phone number is provided and is valid
+//         if (!phoneNumber || isNaN(Number(phoneNumber))) {
+//             throw new ApiError(400, "Please enter a correct phone number.");
+//         }
+
+//         // Find the user by phone number
+//         const existingUser = await User.findOne({ phoneNumber });
+
+//         if (!existingUser) {
+//             throw new ApiError(404, "User with this phone number does not exist");
+//         }
+
+//         // Based on the user type, validate the fields accordingly
+//         switch (existingUser.type) {
+//             case 'consumer':
+//                 validateFields([fullName, phoneNumber, email, gstin, type, companyName, website]);
+//                 // Optionally, verify GSTIN here
+//                 break;
+
+//             case 'transporter':
+//                 validateFields([fullName, phoneNumber, email, type, aadharNumber, panNumber, dob, gender]);
+//                 // Optionally, verify Aadhar and PAN here
+//                 break;
+
+//             case 'owner':
+//             case 'broker':
+//                 validateFields([fullName, phoneNumber, type, aadharNumber, panNumber]);
+//                 // Optionally, verify Aadhar and PAN here
+//                 break;
+
+//             case 'driver':
+//                 validateFields([fullName, phoneNumber, type, aadharNumber, panNumber, dlNumber, dob]);
+//                 // Optionally, verify Aadhar, PAN, and driving license here
+//                 break;
+
+//             default:
+//                 throw new ApiError(400, "User type not found");
+//         }
+
+//         // Update user information
+//         const updatedUser = await User.findOneAndUpdate(
+//             { phoneNumber }, // Find user by phone number
+//             { 
+//                 fullName,
+//                 profileImage,
+//                 email,
+//                 gstin,
+//                 type,
+//                 companyName,
+//                 website,
+//                 aadharNumber,
+//                 panNumber,
+//                 dob,
+//                 gender,
+//                 dlNumber
+//             }, // Update with new data
+//             { new: true } // Return the updated document
+//         );
+
+//         return res.status(200).json({ message: "User data updated successfully", data: updatedUser });
+
+//     } catch (error) {
+//         // Log the error (optional)
+//         // console.log('Error in updateUserByPhoneNumber:', error.message);
+//         throw new ApiError(400, error.message);
+//     }
+// });
+
+
 const updateUserByPhoneNumber = asyncHandler(async (req, res) => {
     try {
-        const { phoneNumber, fullName, profileImage, email, gstin, type, companyName, website, aadharNumber, panNumber, dob, gender, dlNumber } = req.body;
+        const { phoneNumber } = req.params; // Get phoneNumber from URL params
+        const { 
+            fullName, profileImage, email, gstin, type, companyName, 
+            website, aadharNumber, panNumber, dob, gender, dlNumber 
+        } = req.body;
 
-        // Check if phone number is provided and is valid
-        if (!phoneNumber || isNaN(Number(phoneNumber))) {
-            throw new ApiError(400, "Please enter a correct phone number.");
+        // Validate phone number
+        if (!phoneNumber || isNaN(Number(phoneNumber)) || phoneNumber.length < 10) {
+            throw new ApiError(400, "Please enter a valid phone number.");
         }
 
-        // Find the user by phone number
+        // Find user by phone number
         const existingUser = await User.findOne({ phoneNumber });
 
         if (!existingUser) {
-            throw new ApiError(404, "User with this phone number does not exist");
+            throw new ApiError(404, "User with this phone number does not exist.");
         }
 
-        // Based on the user type, validate the fields accordingly
+        // Validate fields based on user type
         switch (existingUser.type) {
             case 'consumer':
                 validateFields([fullName, phoneNumber, email, gstin, type, companyName, website]);
-                // Optionally, verify GSTIN here
                 break;
-
             case 'transporter':
                 validateFields([fullName, phoneNumber, email, type, aadharNumber, panNumber, dob, gender]);
-                // Optionally, verify Aadhar and PAN here
                 break;
-
             case 'owner':
             case 'broker':
                 validateFields([fullName, phoneNumber, type, aadharNumber, panNumber]);
-                // Optionally, verify Aadhar and PAN here
                 break;
-
             case 'driver':
                 validateFields([fullName, phoneNumber, type, aadharNumber, panNumber, dlNumber, dob]);
-                // Optionally, verify Aadhar, PAN, and driving license here
                 break;
-
             default:
-                throw new ApiError(400, "User type not found");
+                throw new ApiError(400, "User type not found.");
         }
 
-        // Update user information
+        // Prepare update object, only include provided fields
+        const updateData = {};
+        if (fullName) updateData.fullName = fullName;
+        if (profileImage) updateData.profileImage = profileImage;
+        if (email) updateData.email = email;
+        if (gstin) updateData.gstin = gstin;
+        if (type) updateData.type = type;
+        if (companyName) updateData.companyName = companyName;
+        if (website) updateData.website = website;
+        if (aadharNumber) updateData.aadharNumber = aadharNumber;
+        if (panNumber) updateData.panNumber = panNumber;
+        if (dob) updateData.dob = dob;
+        if (gender) updateData.gender = gender;
+        if (dlNumber) updateData.dlNumber = dlNumber;
+
+        // Update the user in the database
         const updatedUser = await User.findOneAndUpdate(
-            { phoneNumber }, // Find user by phone number
-            { 
-                fullName,
-                profileImage,
-                email,
-                gstin,
-                type,
-                companyName,
-                website,
-                aadharNumber,
-                panNumber,
-                dob,
-                gender,
-                dlNumber
-            }, // Update with new data
-            { new: true } // Return the updated document
+            { phoneNumber }, 
+            updateData, 
+            { new: true }
         );
 
         return res.status(200).json({ message: "User data updated successfully", data: updatedUser });
 
     } catch (error) {
-        // Log the error (optional)
-        // console.log('Error in updateUserByPhoneNumber:', error.message);
         throw new ApiError(400, error.message);
     }
 });
