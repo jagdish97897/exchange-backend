@@ -10,6 +10,7 @@ import { aadharVerification, panVerification } from "../utils/digilocker.js";
 import { gstVerification } from "../utils/gstinVerification.js";
 import { drivingLicenceVerification } from "../utils/drivingLicenceVerification.js";
 import { s3 } from '../utils/sesConfig.js';
+import jwt from 'jsonwebtoken';
 
 export function validateFields(fields) {
     console.log(fields)
@@ -69,7 +70,7 @@ const register = asyncHandler(async (req, res) => {
             case 'transporter':
                 validateFields([fullName, phoneNumber, email, type, aadharNumber, panNumber, dob, gender]);
                 // await verifyAadharAndPAN(aadharNumber, panNumber, fullName, dob, gender, phoneNumber);
-                await User.create({ fullName, phoneNumber, email, type, companyName, website, aadharNumber, panNumber, profileImage, dob, gender});
+                await User.create({ fullName, phoneNumber, email, type, companyName, website, aadharNumber, panNumber, profileImage, dob, gender });
                 return res.status(201).json({ message: "User registered successfully" });
 
             case 'owner':
@@ -191,13 +192,15 @@ async function uploadToS3(req, res) {
 
 
 const sendLoginOtp = asyncHandler(async (req, res) => {
-    const { phoneNumber } = req.body;
+    const { phoneNumber, type } = req.body;
 
     if (!phoneNumber || isNaN(Number(phoneNumber))) {
         throw new ApiError(400, "Please enter a valid phone number.");
     }
 
-    const user = await User.findOne({ phoneNumber });
+    console.log(type)
+    const user = await User.findOne({ phoneNumber, type: { $in: type ? type : [] }, });
+    console.log(user);
     if (!user) {
         throw new ApiError(404, "User with this phone number does not exist.");
     }
@@ -214,14 +217,14 @@ const sendLoginOtp = asyncHandler(async (req, res) => {
     await user.save();
 
     // Send OTP via SMS (using Fast2SMS or similar)
-    await axios.get('https://www.fast2sms.com/dev/bulkV2', {
-        params: {
-            authorization: process.env.FAST2SMS_API_KEY,
-            variables_values: otp,
-            route: 'otp',
-            numbers: phoneNumber
-        }
-    });
+    // await axios.get('https://www.fast2sms.com/dev/bulkV2', {
+    //     params: {
+    //         authorization: process.env.FAST2SMS_API_KEY,
+    //         variables_values: otp,
+    //         route: 'otp',
+    //         numbers: phoneNumber
+    //     }
+    // });
 
     return res.status(200).json(
         new ApiResponse(200, { otp }, "OTP sent successfully!")
@@ -393,10 +396,44 @@ const updateUserByPhoneNumber = asyncHandler(async (req, res) => {
 });
 
 
+const generateToken = (phoneNumber) => {
+    let jwtSecretKey = process.env.JWT_SECRET_KEY;
+    let data = {
+        time: Date(),
+        phoneNumber,
+    }
 
+    const token = jwt.sign(data, jwtSecretKey);
+
+    return token;
+}
+
+const verifyLoginOtp = asyncHandler(async (req, res) => {
+    const { otp, phoneNumber } = req.body;
+
+    if (!otp || !phoneNumber) {
+        throw new ApiError(400, 'All fields are required');
+    }
+
+    const user = await User.findOne({ phoneNumber });
+
+    if (user.otpExpires < Date.now()) {
+        throw new ApiError(400, 'Your OTP has expired. Please request a new one to continue.');
+    }
+
+    if (user.otp !== Number(otp)) {
+        throw new ApiError(400, 'Invalid OTP');
+    }
+
+    const token = generateToken(phoneNumber);
+
+    return res.status(200).json(
+        new ApiResponse(200, { token }, "Login successful !")
+    );
+});
 
 
 
 export {
-    register, sendOtpOnPhone, sendOtpOnEmail, uploadToS3, sendLoginOtp, getUserByPhoneNumber, updateUserByPhoneNumber
+    register, sendOtpOnPhone, sendOtpOnEmail, uploadToS3, sendLoginOtp, getUserByPhoneNumber, updateUserByPhoneNumber, generateToken, verifyLoginOtp
 }
