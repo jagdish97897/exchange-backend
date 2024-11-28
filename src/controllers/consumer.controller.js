@@ -8,7 +8,66 @@ import mongoose from "mongoose";
 import axios from "axios";
 import otpGenerator from 'otp-generator';
 import { subject } from '../constants.js';
-import { sendEmail } from '../utils/sendEmail.js'
+import { sendEmail } from '../utils/sendEmail.js';
+import { User } from '../models/user.model.js';
+import { validateFields } from "./user.controller.js";
+import { Trip } from "../models/trip.js";
+
+
+const createTrip = asyncHandler(async (req, res) => {
+    const { from, to, userId, cargoDetails, specialInstruction } = req.body;
+
+    validateFields([from, to, userId, cargoDetails,]);
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+        throw new ApiError(400, 'User not found');
+    }
+
+    const trip = await Trip.create({ user, from, to, cargoDetails, specialInstruction, status: 'inactive', amount: 0 });
+
+    return res.status(200).json({ trip, message: 'Trip details created successfully', })
+
+});
+
+const updateTripStatus = asyncHandler(async (req, res) => {
+    const { tripId, amount } = req.body;
+    validateFields([tripId, amount]);
+    const trip = await Trip.findByIdAndUpdate(tripId, { amount });
+
+    return res.status(200).json({ trip, message: 'Trip details updated successfully', })
+
+});
+
+const startTrip = asyncHandler(async (req, res) => {
+    const { tripId } = req.body;
+    validateFields([tripId]);
+    const trip = await Trip.findByIdAndUpdate(tripId, { status: 'started' });
+
+    return res.status(200).json({ trip, message: 'Trip details updated successfully', })
+
+});
+
+const activateTrip = asyncHandler(async (req, res) => {
+    const { tripId } = req.body;
+    validateFields([tripId]);
+    const trip = await Trip.findByIdAndUpdate(tripId, { status: 'active' });
+
+    return res.status(200).json({ trip, message: 'Trip details updated successfully', })
+});
+
+const cancelTrip = asyncHandler(async (req, res) => {
+    const { tripId } = req.body;
+    validateFields([tripId]);
+    const trip = await Trip.findByIdAndUpdate(tripId, { status: 'inactive' });
+
+    return res.status(200).json({ trip, message: 'Trip details updated successfully', })
+
+});
+
+
+
 
 // const generateAccessAndRefereshTokens = async(userId) =>{
 //     try {
@@ -113,9 +172,9 @@ const sendConsumerOtpLogin = asyncHandler(async (req, res) => {
         const phoneNumber = req.body.phoneNumber;
         const existedUser = await Consumer.findOne({ phoneNumber })
 
-    if (!existedUser) {
-        throw new ApiError(409, " phoneNumber does not exists")
-    }
+        if (!existedUser) {
+            throw new ApiError(409, " phoneNumber does not exists")
+        }
         // sent otp on mobile number
         await axios.get('https://www.fast2sms.com/dev/bulkV2', {
             params: {
@@ -128,12 +187,12 @@ const sendConsumerOtpLogin = asyncHandler(async (req, res) => {
 
         // console.log('sent otp')
         return res.status(201).json(
-            new ApiResponse(201, {otp}, "OTP sent successfully!"));
+            new ApiResponse(201, { otp }, "OTP sent successfully!"));
     } catch (error) {
         console.error('Error sending OTP:', error);
         res.status(400).json(
             // { success: false, message: 'Failed to send OTP.' }
-            new ApiResponse(400, {error}, "Failed to send OTP")
+            new ApiResponse(400, { error }, "Failed to send OTP")
         );
     }
 })
@@ -188,5 +247,5 @@ const sendOtpOnEmail = asyncHandler(async (req, res) => {
 })
 
 export {
-    registerConsumer, sendOtpOnPhone, sendOtpOnEmail,sendConsumerOtpLogin
+    registerConsumer, sendOtpOnPhone, sendOtpOnEmail, sendConsumerOtpLogin
 }

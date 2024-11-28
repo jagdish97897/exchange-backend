@@ -43,14 +43,14 @@ const vehicleSchema = new Schema({
     biddingAuthorization: {
         type: Boolean,
     },
-    vehicleLatitude: {
-        type: String,
-        required: false,
-    },
-    vehicleLongitude: {
-        type: String,
-        required: false,
-    },
+    // vehicleLatitude: {
+    //     type: String,
+    //     required: false,
+    // },
+    // vehicleLongitude: {
+    //     type: String,
+    //     required: false,
+    // },
     tdsDeclaration: {
         type: String,
         required: false,
