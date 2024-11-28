@@ -17,31 +17,36 @@ const tripSchema = new Schema({
         required: true,
     },
 
+    tripDate: {
+        type: Date,
+        required: true
+    },
+
     cargoDetails: {
         type: {
             cargoType: {
                 type: String,
-                required: true, // Specify if this is mandatory
+                required: true,
             },
             payloadCost: {
                 type: Number,
-                required: true, // Specify if this is mandatory
+                required: true,
             },
             payloadWeight: {
                 type: Number,
-                required: true, // Specify if this is mandatory
+                required: true, // in tonnes
             },
             payloadHeight: {
                 type: Number,
-                required: false, // Optional
+                required: false, // in feet
             },
             payloadLength: {
                 type: Number,
-                required: false, // Optional
+                required: false, // in feet
             },
             payloadWidth: {
                 type: Number,
-                required: false, // Optional
+                required: false, // in feet
             },
         },
         required: true,
@@ -54,8 +59,8 @@ const tripSchema = new Schema({
 
     status: {
         type: String,
-        enum: ["inactive", "active", "started", "not started"],
-        default: "inactive", // Default status
+        enum: ["created", "inProgress", "completed", "cancelled"],
+        default: "created", // Default status
         required: true,
     },
 

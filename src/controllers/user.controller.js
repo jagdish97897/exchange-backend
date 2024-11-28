@@ -13,7 +13,7 @@ import { s3 } from '../utils/sesConfig.js';
 import jwt from 'jsonwebtoken';
 
 export function validateFields(fields) {
-    console.log(fields)
+    // console.log(fields)
     if (fields.some((field) => typeof field !== 'string' || field.trim() === "")) {
         throw new ApiError(400, "All fields are required and must be valid strings");
     }
@@ -80,29 +80,29 @@ const register = asyncHandler(async (req, res) => {
                 await User.create({ fullName, phoneNumber, type, aadharNumber, panNumber, profileImage });
                 return res.status(201).json({ message: "User registered successfully" });
 
-                case 'driver':
-                    // Make sure to include `dob` and `gender` in the validateFields function
-                    validateFields([fullName, phoneNumber, type, aadharNumber, panNumber, dlNumber, dob, gender]);
-                
-                    // You can also add further verification here for Aadhar, PAN, or Driving License if needed.
-                    // await verifyAadharAndPAN(aadharNumber, panNumber, fullName, dob, gender, phoneNumber);
-                    // await drivingLicenceVerification(dlNumber, dob);
-                
-                    // Create the driver user with all required fields, including `dob` and `gender`
-                    await User.create({
-                        fullName,
-                        phoneNumber,
-                        type,
-                        aadharNumber,
-                        panNumber,
-                        dlNumber,
-                        profileImage,
-                        dob,
-                        gender 
-                    });
-                
-                    return res.status(201).json({ message: "User registered successfully" });
-                
+            case 'driver':
+                // Make sure to include `dob` and `gender` in the validateFields function
+                validateFields([fullName, phoneNumber, type, aadharNumber, panNumber, dlNumber, dob, gender]);
+
+                // You can also add further verification here for Aadhar, PAN, or Driving License if needed.
+                // await verifyAadharAndPAN(aadharNumber, panNumber, fullName, dob, gender, phoneNumber);
+                // await drivingLicenceVerification(dlNumber, dob);
+
+                // Create the driver user with all required fields, including `dob` and `gender`
+                await User.create({
+                    fullName,
+                    phoneNumber,
+                    type,
+                    aadharNumber,
+                    panNumber,
+                    dlNumber,
+                    profileImage,
+                    dob,
+                    gender
+                });
+
+                return res.status(201).json({ message: "User registered successfully" });
+
 
             default:
                 throw new ApiError(400, "User type not found");
@@ -330,9 +330,9 @@ const getUserByPhoneNumber = asyncHandler(async (req, res) => {
 const updateUserByPhoneNumber = asyncHandler(async (req, res) => {
     try {
         const { phoneNumber } = req.params; // Get phoneNumber from URL params
-        const { 
-            fullName, profileImage, email, gstin, type, companyName, 
-            website, aadharNumber, panNumber, dob, gender, dlNumber 
+        const {
+            fullName, profileImage, email, gstin, type, companyName,
+            website, aadharNumber, panNumber, dob, gender, dlNumber
         } = req.body;
 
         // Validate phone number
@@ -383,8 +383,8 @@ const updateUserByPhoneNumber = asyncHandler(async (req, res) => {
 
         // Update the user in the database
         const updatedUser = await User.findOneAndUpdate(
-            { phoneNumber }, 
-            updateData, 
+            { phoneNumber },
+            updateData,
             { new: true }
         );
 
