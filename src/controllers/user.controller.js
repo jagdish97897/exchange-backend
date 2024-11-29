@@ -14,7 +14,7 @@ import jwt from 'jsonwebtoken';
 
 export function validateFields(fields) {
     // console.log(fields)
-    if (fields.some((field) => typeof field !== 'string' || field.trim() === "")) {
+    if (fields.some((field) => field.trim() === "")) {
         throw new ApiError(400, "All fields are required and must be valid strings");
     }
 
@@ -433,7 +433,50 @@ const verifyLoginOtp = asyncHandler(async (req, res) => {
 });
 
 
+const updateUserLocation = asyncHandler(async (req, res) => {
+    const { userId, latitude, longitude } = req.body;
+
+    // Ensure all required fields are present
+    if (!userId || latitude === undefined || longitude === undefined) {
+        return res.status(400).json({
+            success: false,
+            message: 'Missing required fields: userId, latitude, or longitude.'
+        });
+    }
+
+    // Validate latitude and longitude (they should be numbers)
+    if (isNaN(latitude) || isNaN(longitude)) {
+        return res.status(400).json({
+            success: false,
+            message: 'Latitude and Longitude must be valid numbers.'
+        });
+    }
+
+    // Update the user's location in the database
+    const user = await User.findByIdAndUpdate(
+        userId,
+        { currentLocation: { latitude, longitude } },
+        { new: true } // Return the updated document
+    );
+
+    // Handle case where user is not found
+    if (!user) {
+        return res.status(404).json({
+            success: false,
+            message: 'User not found.'
+        });
+    }
+
+    // Return success response
+    return res.status(200).json({
+        success: true,
+        user,
+        message: 'Location updated successfully.'
+    });
+});
+
+
 
 export {
-    register, sendOtpOnPhone, sendOtpOnEmail, uploadToS3, sendLoginOtp, getUserByPhoneNumber, updateUserByPhoneNumber, generateToken, verifyLoginOtp
+    register, sendOtpOnPhone, sendOtpOnEmail, uploadToS3, sendLoginOtp, getUserByPhoneNumber, updateUserByPhoneNumber, generateToken, verifyLoginOtp, updateUserLocation
 }
