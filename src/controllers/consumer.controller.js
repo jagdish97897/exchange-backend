@@ -8,7 +8,9 @@ import mongoose from "mongoose";
 import axios from "axios";
 import otpGenerator from 'otp-generator';
 import { subject } from '../constants.js';
-import { sendEmail } from '../utils/sendEmail.js'
+import { sendEmail } from '../utils/sendEmail.js';
+import { User } from '../models/user.model.js';
+import { validateFields } from "./user.controller.js";
 
 // const generateAccessAndRefereshTokens = async(userId) =>{
 //     try {
@@ -113,9 +115,9 @@ const sendConsumerOtpLogin = asyncHandler(async (req, res) => {
         const phoneNumber = req.body.phoneNumber;
         const existedUser = await Consumer.findOne({ phoneNumber })
 
-    if (!existedUser) {
-        throw new ApiError(409, " phoneNumber does not exists")
-    }
+        if (!existedUser) {
+            throw new ApiError(409, " phoneNumber does not exists")
+        }
         // sent otp on mobile number
         await axios.get('https://www.fast2sms.com/dev/bulkV2', {
             params: {
@@ -128,12 +130,12 @@ const sendConsumerOtpLogin = asyncHandler(async (req, res) => {
 
         // console.log('sent otp')
         return res.status(201).json(
-            new ApiResponse(201, {otp}, "OTP sent successfully!"));
+            new ApiResponse(201, { otp }, "OTP sent successfully!"));
     } catch (error) {
         console.error('Error sending OTP:', error);
         res.status(400).json(
             // { success: false, message: 'Failed to send OTP.' }
-            new ApiResponse(400, {error}, "Failed to send OTP")
+            new ApiResponse(400, { error }, "Failed to send OTP")
         );
     }
 })
@@ -188,5 +190,5 @@ const sendOtpOnEmail = asyncHandler(async (req, res) => {
 })
 
 export {
-    registerConsumer, sendOtpOnPhone, sendOtpOnEmail,sendConsumerOtpLogin
+    registerConsumer, sendOtpOnPhone, sendOtpOnEmail, sendConsumerOtpLogin
 }
