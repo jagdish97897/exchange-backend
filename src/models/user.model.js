@@ -114,6 +114,14 @@ const userSchema = new Schema(
         otpExpires: {
             type: Date,
         },
+        status: {
+            type: String, enum: ["online", "offline"],
+            default: "offline"
+        },
+        vehicle: {
+            type: mongoose.Schema.Types.ObjectId,
+            required: false
+        },
         currentLocation: {
             type: {
                 latitude: {
