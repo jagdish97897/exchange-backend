@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { register, sendOtpOnPhone, sendOtpOnEmail, uploadToS3, sendLoginOtp, getUserByPhoneNumber, updateUserByPhoneNumber, verifyLoginOtp, updateUserLocation } from "../controllers/user.controller.js";
+import { register, sendOtpOnPhone, sendOtpOnEmail, uploadToS3, sendLoginOtp, getUserByPhoneNumber, getUserById,updateUserByPhoneNumber, verifyLoginOtp, updateUserLocation } from "../controllers/user.controller.js";
 import { upload } from "../middlewares/multer.middleware.js";
 // import { verifyJWT } from "../middlewares/auth.middleware.js";
 import { gstVerification } from "../utils/gstinVerification.js";
@@ -17,6 +17,7 @@ router.route("/upload").post(upload.array('files', 5), uploadToS3);
 
 router.route("/sendOtp").post(sendLoginOtp)
 router.get('/user/:phoneNumber', getUserByPhoneNumber);
+router.get('/userid/:id', getUserById);
 router.put('/updateuser/:phoneNumber', updateUserByPhoneNumber);
 
 router.route("/verifyOtp").post(verifyLoginOtp);

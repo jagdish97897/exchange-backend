@@ -104,10 +104,8 @@ const userSchema = new Schema(
             type: String,
             enum: ["male", "female", "other"],
             required: function () { return ["transporter", "driver"].includes(this.type); },
-            uppercase: true,
-            unique: true,
-            sparse: true, // Allows multiple null values
         },
+        
         otp: {
             type: Number,
         },

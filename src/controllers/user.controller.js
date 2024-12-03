@@ -45,73 +45,145 @@ async function verifyAadharAndPAN(aadharNumber, panNumber, fullName, dob, gender
         throw new ApiError(400, error.message);
     }
 }
-
 const register = asyncHandler(async (req, res) => {
     try {
-        const { fullName, profileImage, phoneNumber, email, gstin, type, companyName, website, aadharNumber, panNumber, dob, gender, dlNumber } = req.body;
+        const {
+            fullName,
+            profileImage,
+            phoneNumber,
+            email,
+            gstin,
+            type,
+            companyName,
+            website,
+            aadharNumber,
+            panNumber,
+            dob,
+            gender,
+            dlNumber,
+        } = req.body;
 
+        // Validate phone number
         if (!phoneNumber || isNaN(Number(phoneNumber))) {
             throw new ApiError(400, "Please enter a correct phone number.");
         }
 
+        // Check if user already exists
         const existingUser = await User.findOne({ phoneNumber });
-
         if (existingUser) {
-            throw new ApiError(400, "User with this phone number already exists");
+            throw new ApiError(400, "User with this phone number already exists.");
         }
+
+        // Validate and create user based on type
+        let userData = { fullName, profileImage, phoneNumber, email, type };
 
         switch (type) {
-            case 'consumer':
-                validateFields([fullName, phoneNumber, email, gstin, type, companyName, website]);
-                // await gstVerification(gstin);
-                await User.create({ fullName, phoneNumber, email, gstin, type, companyName, website, profileImage });
-                return res.status(201).json({ message: "User registered successfully" });
+            case "consumer":
+                validateFields([fullName, phoneNumber, email, gstin, companyName, website]);
+                Object.assign(userData, { gstin, companyName, website });
+                break;
 
-            case 'transporter':
-                validateFields([fullName, phoneNumber, email, type, aadharNumber, panNumber, dob, gender]);
-                // await verifyAadharAndPAN(aadharNumber, panNumber, fullName, dob, gender, phoneNumber);
-                await User.create({ fullName, phoneNumber, email, type, companyName, website, aadharNumber, panNumber, profileImage, dob, gender });
-                return res.status(201).json({ message: "User registered successfully" });
+            case "transporter":
+                validateFields([fullName, phoneNumber, aadharNumber, panNumber, dob, gender]);
+                Object.assign(userData, { aadharNumber, panNumber, dob, gender });
+                break;
 
-            case 'owner':
-            case 'broker':
-                validateFields([fullName, phoneNumber, type, aadharNumber, panNumber]);
-                // await verifyAadharAndPAN(aadharNumber, panNumber, fullName, dob, gender, phoneNumber);
-                await User.create({ fullName, phoneNumber, type, aadharNumber, panNumber, profileImage });
-                return res.status(201).json({ message: "User registered successfully" });
+            case "owner":
+            case "broker":
+                validateFields([fullName, phoneNumber, aadharNumber, panNumber]);
+                Object.assign(userData, { aadharNumber, panNumber });
+                break;
 
-            case 'driver':
-                // Make sure to include `dob` and `gender` in the validateFields function
-                validateFields([fullName, phoneNumber, type, aadharNumber, panNumber, dlNumber, dob, gender]);
-
-                // You can also add further verification here for Aadhar, PAN, or Driving License if needed.
-                // await verifyAadharAndPAN(aadharNumber, panNumber, fullName, dob, gender, phoneNumber);
-                // await drivingLicenceVerification(dlNumber, dob);
-
-                // Create the driver user with all required fields, including `dob` and `gender`
-                await User.create({
-                    fullName,
-                    phoneNumber,
-                    type,
-                    aadharNumber,
-                    panNumber,
-                    dlNumber,
-                    profileImage,
-                    dob,
-                    gender
-                });
-
-                return res.status(201).json({ message: "User registered successfully" });
-
+            case "driver":
+                validateFields([fullName, phoneNumber, aadharNumber, panNumber, dlNumber, dob, gender]);
+                Object.assign(userData, { aadharNumber, panNumber, dlNumber, dob, gender });
+                break;
 
             default:
-                throw new ApiError(400, "User type not found");
+                throw new ApiError(400, "Invalid user type.");
         }
 
+        // Create user
+        await User.create(userData);
+
+        return res.status(201).json({ message: "User registered successfully." });
     } catch (error) {
-        throw new ApiError(400, error.message);
+        // Log the error for debugging
+        console.error("Error during registration:", error);
+
+        // Send appropriate error response
+        return res.status(error.statusCode || 500).json({
+            message: error.message || "An unexpected error occurred.",
+        });
     }
 });
+
+// const register = asyncHandler(async (req, res) => {
+//     try {
+//         const { fullName, profileImage, phoneNumber, email, gstin, type, companyName, website, aadharNumber, panNumber, dob, gender, dlNumber } = req.body;
+
+//         if (!phoneNumber || isNaN(Number(phoneNumber))) {
+//             throw new ApiError(400, "Please enter a correct phone number.");
+//         }
+
+//         const existingUser = await User.findOne({ phoneNumber });
+
+//         if (existingUser) {
+//             throw new ApiError(400, "User with this phone number already exists");
+//         }
+
+//         switch (type) {
+//             case 'consumer':
+//                 validateFields([fullName, phoneNumber, email, gstin, type, companyName, website]);
+//                 // await gstVerification(gstin);
+//                 await User.create({ fullName, phoneNumber, email, gstin, type, companyName, website, profileImage });
+//                 return res.status(201).json({ message: "User registered successfully" });
+
+//             case 'transporter':
+//                 validateFields([fullName, phoneNumber, email, type, aadharNumber, panNumber, dob, gender]);
+//                 // await verifyAadharAndPAN(aadharNumber, panNumber, fullName, dob, gender, phoneNumber);
+//                 await User.create({ fullName, phoneNumber, email, type, companyName, website, aadharNumber, panNumber, profileImage, dob, gender });
+//                 return res.status(201).json({ message: "User registered successfully" });
+
+//             case 'owner':
+//             case 'broker':
+//                 validateFields([fullName, phoneNumber, type, aadharNumber, panNumber]);
+//                 // await verifyAadharAndPAN(aadharNumber, panNumber, fullName, dob, gender, phoneNumber);
+//                 await User.create({ fullName, phoneNumber, type, aadharNumber, panNumber, profileImage });
+//                 return res.status(201).json({ message: "User registered successfully" });
+
+//                 case 'driver':
+//                     // Make sure to include `dob` and `gender` in the validateFields function
+//                     validateFields([fullName, phoneNumber, type, aadharNumber, panNumber, dlNumber, dob, gender]);
+                
+//                     // You can also add further verification here for Aadhar, PAN, or Driving License if needed.
+//                     // await verifyAadharAndPAN(aadharNumber, panNumber, fullName, dob, gender, phoneNumber);
+//                     // await drivingLicenceVerification(dlNumber, dob);
+                
+//                     // Create the driver user with all required fields, including `dob` and `gender`
+//                     await User.create({
+//                         fullName,
+//                         phoneNumber,
+//                         type,
+//                         aadharNumber,
+//                         panNumber,
+//                         dlNumber,
+//                         profileImage,
+//                         dob,
+//                         gender 
+//                     });
+                
+//                     return res.status(201).json({ message: "User registered successfully" });
+                
+
+//             default:
+//                 throw new ApiError(400, "User type not found");
+//         }
+
+//     } catch (error) {
+//         throw new ApiError(400, error.message);
+//     }
+// });
 
 
 const sendOtpOnPhone = asyncHandler(async (req, res) => {
@@ -253,6 +325,30 @@ const getUserByPhoneNumber = asyncHandler(async (req, res) => {
         throw new ApiError(400, error.message);
     }
 });
+
+const getUserById = asyncHandler(async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Validate ID
+        if (!id || !id.match(/^[0-9a-fA-F]{24}$/)) {
+            throw new ApiError(400, "Please provide a valid user ID.");
+        }
+
+        // Fetch user details
+        const user = await User.findById(id);
+
+        if (!user) {
+            throw new ApiError(404, "User not found.");
+        }
+
+        // Respond with user details
+        res.status(200).json(user);
+    } catch (error) {
+        throw new ApiError(400, error.message);
+    }
+});
+
 
 // const updateUserByPhoneNumber = asyncHandler(async (req, res) => {
 //     try {
@@ -478,5 +574,5 @@ const updateUserLocation = asyncHandler(async (req, res) => {
 
 
 export {
-    register, sendOtpOnPhone, sendOtpOnEmail, uploadToS3, sendLoginOtp, getUserByPhoneNumber, updateUserByPhoneNumber, generateToken, verifyLoginOtp, updateUserLocation
+    register, sendOtpOnPhone, sendOtpOnEmail, uploadToS3, sendLoginOtp, getUserByPhoneNumber, updateUserByPhoneNumber, generateToken, verifyLoginOtp, updateUserLocation,getUserById
 }

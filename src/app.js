@@ -1,7 +1,8 @@
 import express from "express"
 import cors from "cors"
 import cookieParser from "cookie-parser"
-import userRouter from './routes/user.routes.js';
+import userRouter from './routes/user.routes.js'
+import vehicleRoutes from "./routes/vehicle.routes.js"
 import { getLocation } from "../utils/location.js";
 import tripRouter from "./routes/trip.route.js";
 import { createServer } from 'http';
@@ -54,6 +55,8 @@ app.use(express.static("public"))
 app.use(cookieParser())
 
 //routes declaration
+app.use("/api/v1/users", userRouter)
+app.use("/api", vehicleRoutes);
 app.use("/api/v1/users", userRouter);
 app.use("/api/trips", tripRouter);
 
