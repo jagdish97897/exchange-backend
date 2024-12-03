@@ -11,6 +11,7 @@ import { gstVerification } from "../utils/gstinVerification.js";
 import { drivingLicenceVerification } from "../utils/drivingLicenceVerification.js";
 import { s3 } from '../utils/sesConfig.js';
 import jwt from 'jsonwebtoken';
+import { sendEmailNotification } from "../../utils/notification.js";
 
 export function validateFields(fields) {
     // console.log(fields)
@@ -106,6 +107,10 @@ const register = asyncHandler(async (req, res) => {
         // Create user
         await User.create(userData);
 
+        if (email) {
+            await sendEmailNotification({ email, fullName, phoneNumber });
+        }
+
         return res.status(201).json({ message: "User registered successfully." });
     } catch (error) {
         // Log the error for debugging
@@ -155,11 +160,11 @@ const register = asyncHandler(async (req, res) => {
 //                 case 'driver':
 //                     // Make sure to include `dob` and `gender` in the validateFields function
 //                     validateFields([fullName, phoneNumber, type, aadharNumber, panNumber, dlNumber, dob, gender]);
-                
+
 //                     // You can also add further verification here for Aadhar, PAN, or Driving License if needed.
 //                     // await verifyAadharAndPAN(aadharNumber, panNumber, fullName, dob, gender, phoneNumber);
 //                     // await drivingLicenceVerification(dlNumber, dob);
-                
+
 //                     // Create the driver user with all required fields, including `dob` and `gender`
 //                     await User.create({
 //                         fullName,
@@ -172,9 +177,9 @@ const register = asyncHandler(async (req, res) => {
 //                         dob,
 //                         gender 
 //                     });
-                
+
 //                     return res.status(201).json({ message: "User registered successfully" });
-                
+
 
 //             default:
 //                 throw new ApiError(400, "User type not found");
@@ -574,5 +579,5 @@ const updateUserLocation = asyncHandler(async (req, res) => {
 
 
 export {
-    register, sendOtpOnPhone, sendOtpOnEmail, uploadToS3, sendLoginOtp, getUserByPhoneNumber, updateUserByPhoneNumber, generateToken, verifyLoginOtp, updateUserLocation,getUserById
+    register, sendOtpOnPhone, sendOtpOnEmail, uploadToS3, sendLoginOtp, getUserByPhoneNumber, updateUserByPhoneNumber, generateToken, verifyLoginOtp, updateUserLocation, getUserById
 }
