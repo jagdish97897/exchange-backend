@@ -9,8 +9,11 @@ import { sendEmail } from '../utils/sendEmail.js';
 import { aadharVerification, panVerification } from "../utils/digilocker.js";
 import { gstVerification } from "../utils/gstinVerification.js";
 import { drivingLicenceVerification } from "../utils/drivingLicenceVerification.js";
-import { s3 } from '../utils/sesConfig.js';
+// import { s3 } from '../utils/sesConfig.js';
 import jwt from 'jsonwebtoken';
+import AWS from 'aws-sdk';
+import multer from 'multer';
+
 
 export function validateFields(fields) {
     // console.log(fields)
@@ -45,78 +48,201 @@ async function verifyAadharAndPAN(aadharNumber, panNumber, fullName, dob, gender
         throw new ApiError(400, error.message);
     }
 }
-const register = asyncHandler(async (req, res) => {
-    try {
-        const {
-            fullName,
-            profileImage,
-            phoneNumber,
-            email,
-            gstin,
-            type,
-            companyName,
-            website,
-            aadharNumber,
-            panNumber,
-            dob,
-            gender,
-            dlNumber,
-        } = req.body;
 
-        // Validate phone number
-        if (!phoneNumber || isNaN(Number(phoneNumber))) {
-            throw new ApiError(400, "Please enter a correct phone number.");
-        }
 
-        // Check if user already exists
-        const existingUser = await User.findOne({ phoneNumber });
-        if (existingUser) {
-            throw new ApiError(400, "User with this phone number already exists.");
-        }
-
-        // Validate and create user based on type
-        let userData = { fullName, profileImage, phoneNumber, email, type };
-
-        switch (type) {
-            case "consumer":
-                validateFields([fullName, phoneNumber, email, gstin, companyName, website]);
-                Object.assign(userData, { gstin, companyName, website });
-                break;
-
-            case "transporter":
-                validateFields([fullName, phoneNumber, aadharNumber, panNumber, dob, gender]);
-                Object.assign(userData, { aadharNumber, panNumber, dob, gender });
-                break;
-
-            case "owner":
-            case "broker":
-                validateFields([fullName, phoneNumber, aadharNumber, panNumber]);
-                Object.assign(userData, { aadharNumber, panNumber });
-                break;
-
-            case "driver":
-                validateFields([fullName, phoneNumber, aadharNumber, panNumber, dlNumber, dob, gender]);
-                Object.assign(userData, { aadharNumber, panNumber, dlNumber, dob, gender });
-                break;
-
-            default:
-                throw new ApiError(400, "Invalid user type.");
-        }
-
-        // Create user
-        await User.create(userData);
-
-        return res.status(201).json({ message: "User registered successfully." });
-    } catch (error) {
-        // Log the error for debugging
-        console.error("Error during registration:", error);
-
-        // Send appropriate error response
-        return res.status(error.statusCode || 500).json({
-            message: error.message || "An unexpected error occurred.",
-        });
-    }
+const s3 = new AWS.S3({
+    accessKeyId: process.env.AWS_ACCESS_KEY,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    region: process.env.AWS_REGION,
 });
+
+// Set up multer for in-memory storage
+const storage = multer.memoryStorage();
+const upload = multer({
+    storage,
+    limits: { fileSize: 5 * 1024 * 1024 }, // Limit file size to 5MB
+    fileFilter: (req, file, cb) => {
+        if (['image/jpeg', 'image/png', 'image/jpg'].includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new ApiError(400, 'Invalid file type. Please upload an image.'), false);
+        }
+    },
+}).single('profileImage'); // Accept only one file with the key 'profileImage'
+
+// Helper function to upload to S3
+const uploadToS3 = async (buffer, fileName, mimeType) => {
+    const params = {
+        Bucket: process.env.AWS_BUCKET,
+        Key: `profile-images/${Date.now()}-${fileName}`, // Unique file name
+        Body: buffer,
+        ContentType: mimeType, // Dynamically set MIME type
+    };
+
+    try {
+        const s3Data = await s3.upload(params).promise();
+        return s3Data.Location; // Return the uploaded file's URL
+    } catch (error) {
+        console.error('Error uploading to S3:', error);
+        throw new ApiError(500, 'Error uploading image to S3');
+    }
+};
+
+// Registration route
+const register = asyncHandler(async (req, res) => {
+    upload(req, res, async (err) => {
+        if (err instanceof multer.MulterError) {
+            return res.status(400).json({ message: 'Multer error: ' + err.message });
+        } else if (err) {
+            return res.status(err.statusCode || 500).json({ message: err.message });
+        }
+
+        try {
+            const {
+                fullName,
+                phoneNumber,
+                email,
+                gstin,
+                type,
+                companyName,
+                website,
+                aadharNumber,
+                panNumber,
+                dob,
+                gender,
+                dlNumber,
+            } = req.body;
+
+            // Validate phone number
+            if (!phoneNumber || isNaN(Number(phoneNumber))) {
+                throw new ApiError(400, 'Please enter a correct phone number.');
+            }
+
+            // Check if user already exists
+            const existingUser = await User.findOne({ phoneNumber });
+            if (existingUser) {
+                throw new ApiError(400, 'User with this phone number already exists.');
+            }
+
+            // Process profile image
+            let profileImageUrl = null;
+            if (req.file) {
+                profileImageUrl = await uploadToS3(req.file.buffer, req.file.originalname, req.file.mimetype);
+            }
+
+            // Validate and create user based on type
+            let userData = { fullName, phoneNumber, email, type, profileImage: profileImageUrl };
+
+            switch (type) {
+                case 'consumer':
+                    validateFields([fullName, phoneNumber, email, gstin, companyName, website]);
+                    Object.assign(userData, { gstin, companyName, website });
+                    break;
+
+                case 'transporter':
+                    validateFields([fullName, phoneNumber, aadharNumber, panNumber, dob, gender]);
+                    Object.assign(userData, { aadharNumber, panNumber, dob, gender });
+                    break;
+
+                case 'owner':
+                case 'broker':
+                    validateFields([fullName, phoneNumber, aadharNumber, panNumber]);
+                    Object.assign(userData, { aadharNumber, panNumber });
+                    break;
+
+                case 'driver':
+                    validateFields([fullName, phoneNumber, aadharNumber, panNumber, dlNumber, dob, gender]);
+                    Object.assign(userData, { aadharNumber, panNumber, dlNumber, dob, gender });
+                    break;
+
+                default:
+                    throw new ApiError(400, 'Invalid user type.');
+            }
+
+            // Create user
+            await User.create(userData);
+
+            return res.status(201).json({ message: 'User registered successfully.', profileImageUrl });
+        } catch (error) {
+            console.error('Error during registration:', error);
+            return res.status(error.statusCode || 500).json({ message: error.message });
+        }
+    });
+});
+
+
+// const register = asyncHandler(async (req, res) => {
+//     try {
+//         const {
+//             fullName,
+//             profileImage,
+//             phoneNumber,
+//             email,
+//             gstin,
+//             type,
+//             companyName,
+//             website,
+//             aadharNumber,
+//             panNumber,
+//             dob,
+//             gender,
+//             dlNumber,
+//         } = req.body;
+
+//         // Validate phone number
+//         if (!phoneNumber || isNaN(Number(phoneNumber))) {
+//             throw new ApiError(400, "Please enter a correct phone number.");
+//         }
+
+//         // Check if user already exists
+//         const existingUser = await User.findOne({ phoneNumber });
+//         if (existingUser) {
+//             throw new ApiError(400, "User with this phone number already exists.");
+//         }
+
+//         // Validate and create user based on type
+//         let userData = { fullName, profileImage, phoneNumber, email, type };
+
+//         switch (type) {
+//             case "consumer":
+//                 validateFields([fullName, phoneNumber, email, gstin, companyName, website]);
+//                 Object.assign(userData, { gstin, companyName, website });
+//                 break;
+
+//             case "transporter":
+//                 validateFields([fullName, phoneNumber, aadharNumber, panNumber, dob, gender]);
+//                 Object.assign(userData, { aadharNumber, panNumber, dob, gender });
+//                 break;
+
+//             case "owner":
+//             case "broker":
+//                 validateFields([fullName, phoneNumber, aadharNumber, panNumber]);
+//                 Object.assign(userData, { aadharNumber, panNumber });
+//                 break;
+
+//             case "driver":
+//                 validateFields([fullName, phoneNumber, aadharNumber, panNumber, dlNumber, dob, gender]);
+//                 Object.assign(userData, { aadharNumber, panNumber, dlNumber, dob, gender });
+//                 break;
+
+//             default:
+//                 throw new ApiError(400, "Invalid user type.");
+//         }
+
+//         // Create user
+//         await User.create(userData);
+
+//         return res.status(201).json({ message: "User registered successfully." });
+//     } catch (error) {
+//         // Log the error for debugging
+//         console.error("Error during registration:", error);
+
+//         // Send appropriate error response
+//         return res.status(error.statusCode || 500).json({
+//             message: error.message || "An unexpected error occurred.",
+//         });
+//     }
+// });
 
 // const register = asyncHandler(async (req, res) => {
 //     try {
@@ -232,35 +358,35 @@ const sendOtpOnEmail = asyncHandler(async (req, res) => {
     }
 })
 
-async function uploadToS3(req, res) {
+// async function uploadToS3(req, res) {
 
-    if (!req.files || req.files.length === 0) {
-        return res.status(400).send('No files uploaded.');
-    }
+//     if (!req.files || req.files.length === 0) {
+//         return res.status(400).send('No files uploaded.');
+//     }
 
-    try {
-        const uploadPromises = req.files.map((file) => {
-            const uploadParams = {
-                Bucket: process.env.AWS_BUCKET,
-                Key: file.originalname, // Use the original file name as the S3 key
-                Body: file.buffer,
-                ContentType: file.mimetype, // Set the appropriate content type
-            };
+//     try {
+//         const uploadPromises = req.files.map((file) => {
+//             const uploadParams = {
+//                 Bucket: process.env.AWS_BUCKET,
+//                 Key: file.originalname, // Use the original file name as the S3 key
+//                 Body: file.buffer,
+//                 ContentType: file.mimetype, // Set the appropriate content type
+//             };
 
-            return s3.upload(uploadParams).promise();
-        });
+//             return s3.upload(uploadParams).promise();
+//         });
 
-        const results = await Promise.all(uploadPromises);
+//         const results = await Promise.all(uploadPromises);
 
-        const uploadedFiles = results.map(result => result.Location);
-        console.log('Files uploaded successfully:', uploadedFiles);
-        res.send(`Files uploaded successfully to: ${uploadedFiles.join(', ')}`);
+//         const uploadedFiles = results.map(result => result.Location);
+//         console.log('Files uploaded successfully:', uploadedFiles);
+//         res.send(`Files uploaded successfully to: ${uploadedFiles.join(', ')}`);
 
-    } catch (error) {
-        console.error('Error uploading files to S3:', error);
-        res.status(500).send('Error uploading files');
-    }
-}
+//     } catch (error) {
+//         console.error('Error uploading files to S3:', error);
+//         res.status(500).send('Error uploading files');
+//     }
+// }
 
 
 const sendLoginOtp = asyncHandler(async (req, res) => {
@@ -350,74 +476,71 @@ const getUserById = asyncHandler(async (req, res) => {
 });
 
 
+
 // const updateUserByPhoneNumber = asyncHandler(async (req, res) => {
 //     try {
-//         const { phoneNumber, fullName, profileImage, email, gstin, type, companyName, website, aadharNumber, panNumber, dob, gender, dlNumber } = req.body;
+//         const { phoneNumber } = req.params; // Get phoneNumber from URL params
+//         const {
+//             fullName, profileImage, email, gstin, type, companyName,
+//             website, aadharNumber, panNumber, dob, gender, dlNumber
+//         } = req.body;
 
-//         // Check if phone number is provided and is valid
-//         if (!phoneNumber || isNaN(Number(phoneNumber))) {
-//             throw new ApiError(400, "Please enter a correct phone number.");
+//         // Validate phone number
+//         if (!phoneNumber || isNaN(Number(phoneNumber)) || phoneNumber.length < 10) {
+//             throw new ApiError(400, "Please enter a valid phone number.");
 //         }
 
-//         // Find the user by phone number
+//         // Find user by phone number
 //         const existingUser = await User.findOne({ phoneNumber });
 
 //         if (!existingUser) {
-//             throw new ApiError(404, "User with this phone number does not exist");
+//             throw new ApiError(404, "User with this phone number does not exist.");
 //         }
 
-//         // Based on the user type, validate the fields accordingly
+//         // Validate fields based on user type
 //         switch (existingUser.type) {
 //             case 'consumer':
 //                 validateFields([fullName, phoneNumber, email, gstin, type, companyName, website]);
-//                 // Optionally, verify GSTIN here
 //                 break;
-
 //             case 'transporter':
 //                 validateFields([fullName, phoneNumber, email, type, aadharNumber, panNumber, dob, gender]);
-//                 // Optionally, verify Aadhar and PAN here
 //                 break;
-
 //             case 'owner':
 //             case 'broker':
 //                 validateFields([fullName, phoneNumber, type, aadharNumber, panNumber]);
-//                 // Optionally, verify Aadhar and PAN here
 //                 break;
-
 //             case 'driver':
 //                 validateFields([fullName, phoneNumber, type, aadharNumber, panNumber, dlNumber, dob]);
-//                 // Optionally, verify Aadhar, PAN, and driving license here
 //                 break;
-
 //             default:
-//                 throw new ApiError(400, "User type not found");
+//                 throw new ApiError(400, "User type not found.");
 //         }
 
-//         // Update user information
+//         // Prepare update object, only include provided fields
+//         const updateData = {};
+//         if (fullName) updateData.fullName = fullName;
+//         if (profileImage) updateData.profileImage = profileImage;
+//         if (email) updateData.email = email;
+//         if (gstin) updateData.gstin = gstin;
+//         if (type) updateData.type = type;
+//         if (companyName) updateData.companyName = companyName;
+//         if (website) updateData.website = website;
+//         if (aadharNumber) updateData.aadharNumber = aadharNumber;
+//         if (panNumber) updateData.panNumber = panNumber;
+//         if (dob) updateData.dob = dob;
+//         if (gender) updateData.gender = gender;
+//         if (dlNumber) updateData.dlNumber = dlNumber;
+
+//         // Update the user in the database
 //         const updatedUser = await User.findOneAndUpdate(
-//             { phoneNumber }, // Find user by phone number
-//             { 
-//                 fullName,
-//                 profileImage,
-//                 email,
-//                 gstin,
-//                 type,
-//                 companyName,
-//                 website,
-//                 aadharNumber,
-//                 panNumber,
-//                 dob,
-//                 gender,
-//                 dlNumber
-//             }, // Update with new data
-//             { new: true } // Return the updated document
+//             { phoneNumber },
+//             updateData,
+//             { new: true }
 //         );
 
 //         return res.status(200).json({ message: "User data updated successfully", data: updatedUser });
 
 //     } catch (error) {
-//         // Log the error (optional)
-//         // console.log('Error in updateUserByPhoneNumber:', error.message);
 //         throw new ApiError(400, error.message);
 //     }
 // });
@@ -425,7 +548,7 @@ const getUserById = asyncHandler(async (req, res) => {
 
 const updateUserByPhoneNumber = asyncHandler(async (req, res) => {
     try {
-        const { phoneNumber } = req.params; // Get phoneNumber from URL params
+        const { phoneNumber } = req.params;
         const {
             fullName, profileImage, email, gstin, type, companyName,
             website, aadharNumber, panNumber, dob, gender, dlNumber
@@ -465,7 +588,6 @@ const updateUserByPhoneNumber = asyncHandler(async (req, res) => {
         // Prepare update object, only include provided fields
         const updateData = {};
         if (fullName) updateData.fullName = fullName;
-        if (profileImage) updateData.profileImage = profileImage;
         if (email) updateData.email = email;
         if (gstin) updateData.gstin = gstin;
         if (type) updateData.type = type;
@@ -476,6 +598,15 @@ const updateUserByPhoneNumber = asyncHandler(async (req, res) => {
         if (dob) updateData.dob = dob;
         if (gender) updateData.gender = gender;
         if (dlNumber) updateData.dlNumber = dlNumber;
+        // if (profileImage) updateData.profileImage = profileImage;
+
+console.log('file gfgfgfgfg ',req.file);
+        // If a new profile image is provided, update it
+        if (req.file) {
+           const profileImageUrl = await uploadToS3(req.file.buffer, req.file.originalname, req.file.type);
+
+            updateData.profileImage = [profileImageUrl]; // Save image URL in the profileImage array
+        }
 
         // Update the user in the database
         const updatedUser = await User.findOneAndUpdate(
@@ -490,6 +621,7 @@ const updateUserByPhoneNumber = asyncHandler(async (req, res) => {
         throw new ApiError(400, error.message);
     }
 });
+
 
 
 const generateToken = (phoneNumber) => {
