@@ -120,9 +120,47 @@ const register = asyncHandler(async (req, res) => {
             }
 
             // Check if user already exists
-            const existingUser = await User.findOne({ phoneNumber });
+            // Create an array to hold conditions
+            const conditions = [];
+
+            if (phoneNumber) {
+                conditions.push({ phoneNumber });
+            }
+            if (email) {
+                conditions.push({ email });
+            }
+            if (aadharNumber) {
+                conditions.push({ aadharNumber });
+            }
+            if (panNumber) {
+                conditions.push({ panNumber });
+            }
+            if (dlNumber) {
+                conditions.push({ dlNumber });
+            }
+
+            // Only run the query if conditions exist
+            let existingUser = null;
+            if (conditions.length > 0) {
+                existingUser = await User.findOne({ $or: conditions });
+            }
+
             if (existingUser) {
-                throw new ApiError(400, 'User with this phone number already exists.');
+                // Handle the conflict here
+                let conflictField = '';
+                if (existingUser.phoneNumber === phoneNumber) {
+                    conflictField = 'phone number';
+                } else if (existingUser.email === email) {
+                    conflictField = 'email';
+                } else if (existingUser.aadharNumber === aadharNumber) {
+                    conflictField = 'Aadhar number';
+                } else if (existingUser.panNumber === panNumber) {
+                    conflictField = 'PAN number';
+                } else if (existingUser.dlNumber === dlNumber) {
+                    conflictField = 'Driving License number';
+                }
+
+                throw new ApiError(400, `User with this ${conflictField} already exists.`);
             }
 
             // Process profile image
@@ -320,14 +358,14 @@ const sendOtpOnPhone = asyncHandler(async (req, res) => {
         const phoneNumber = req.body.phoneNumber;
 
         // sent otp on mobile number
-        await axios.get('https://www.fast2sms.com/dev/bulkV2', {
-            params: {
-                authorization: process.env.FAST2SMS_API_KEY,
-                variables_values: otp,
-                route: 'otp',
-                numbers: phoneNumber
-            }
-        });
+        // await axios.get('https://www.fast2sms.com/dev/bulkV2', {
+        //     params: {
+        //         authorization: process.env.FAST2SMS_API_KEY,
+        //         variables_values: otp,
+        //         route: 'otp',
+        //         numbers: phoneNumber
+        //     }
+        // });
 
         return res.status(201).json(
             new ApiResponse(201, { otp }, "OTP sent successfully!"));
@@ -601,10 +639,10 @@ const updateUserByPhoneNumber = asyncHandler(async (req, res) => {
         if (dlNumber) updateData.dlNumber = dlNumber;
         // if (profileImage) updateData.profileImage = profileImage;
 
-console.log('file gfgfgfgfg ',req.file);
+        console.log('file gfgfgfgfg ', req.file);
         // If a new profile image is provided, update it
         if (req.file) {
-           const profileImageUrl = await uploadToS3(req.file.buffer, req.file.originalname, req.file.type);
+            const profileImageUrl = await uploadToS3(req.file.buffer, req.file.originalname, req.file.type);
 
             updateData.profileImage = [profileImageUrl]; // Save image URL in the profileImage array
         }

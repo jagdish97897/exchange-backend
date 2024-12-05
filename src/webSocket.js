@@ -39,4 +39,4 @@ const configureSocket = (server) => {
     return io; // Return the io instance if needed elsewhere
 };
 
-export default configureSocket;
+export { configureSocket };
