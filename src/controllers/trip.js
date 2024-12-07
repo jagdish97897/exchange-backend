@@ -31,11 +31,11 @@ const getDistance = asyncHandler(async (req, res) => {
 });
 
 const createTrip = asyncHandler(async (req, res) => {
-    const { from, to, userId, tripDate, cargoDetails, specialInstruction } = req.body;
+    const { from, to, phoneNumber, tripDate, cargoDetails, specialInstruction, currentLocation } = req.body;
 
-    validateFields([from, to, userId]);
+    validateFields([from, to, phoneNumber]);
 
-    const user = await User.findById(userId);
+    const user = await User.findOne({ phoneNumber });
 
     if (!user) {
         throw new ApiError(400, 'User not found');
