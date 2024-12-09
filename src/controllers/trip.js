@@ -7,7 +7,7 @@ import axios from "axios";
 const getDistance = asyncHandler(async (req, res) => {
     const { to, from } = req.query;
 
-    console.log(to, from);
+    // console.log(to, from);
     const response = await axios.get(
         `https://maps.googleapis.com/maps/api/distancematrix/json`,
         {
@@ -18,7 +18,7 @@ const getDistance = asyncHandler(async (req, res) => {
             }
         }
     );
-    console.log(response);
+    // console.log(response);
     if (!response) {
         throw new Error('Invalid pincode');
     }
@@ -26,7 +26,7 @@ const getDistance = asyncHandler(async (req, res) => {
     // Extract distance information
     const distanceInfo = response?.data?.rows[0]?.elements[0];
     const distance = distanceInfo?.distance?.text;
-    console.log('distance : ', distance);
+    // console.log('distance : ', distance);
     return res.status(200).json({ success: true, distance });
 });
 

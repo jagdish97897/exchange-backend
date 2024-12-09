@@ -435,9 +435,9 @@ const sendLoginOtp = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Please enter a valid phone number.");
     }
 
-    console.log(type)
+    // console.log(type)
     const user = await User.findOne({ phoneNumber, type: { $in: type ? type : [] }, });
-    console.log(user);
+    // console.log(user);
     if (!user) {
         throw new ApiError(404, "User with this phone number does not exist.");
     }
@@ -639,7 +639,7 @@ const updateUserByPhoneNumber = asyncHandler(async (req, res) => {
         if (dlNumber) updateData.dlNumber = dlNumber;
         // if (profileImage) updateData.profileImage = profileImage;
 
-        console.log('file gfgfgfgfg ', req.file);
+        // console.log('file gfgfgfgfg ', req.file);
         // If a new profile image is provided, update it
         if (req.file) {
             const profileImageUrl = await uploadToS3(req.file.buffer, req.file.originalname, req.file.type);
