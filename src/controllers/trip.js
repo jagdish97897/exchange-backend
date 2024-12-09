@@ -41,7 +41,7 @@ const createTrip = asyncHandler(async (req, res) => {
         throw new ApiError(400, 'User not found');
     }
 
-    const trip = await Trip.create({ user, from, to, tripDate: tripDate || new Date(), cargoDetails, specialInstruction, status: 'created', amount: 0 });
+    const trip = await Trip.create({ user, from, to, tripDate: tripDate || new Date(), cargoDetails, specialInstruction, status: 'created', amount: 0, currentLocation });
 
     return res.status(200).json({ tripId: trip._id, status: 'created', message: 'Trip request has been received.' })
 });

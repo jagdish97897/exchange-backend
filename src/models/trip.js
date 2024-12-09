@@ -68,6 +68,16 @@ const tripSchema = new Schema({
         type: Number,
         required: false,
     },
+    currentLocation: {
+        type: {
+            latitude: {
+                type: Number,
+            },
+            longitude: {
+                type: Number
+            }
+        }
+    }
 });
 
 export const Trip = mongoose.model("Trip", tripSchema);
