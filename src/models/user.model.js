@@ -102,7 +102,7 @@ const userSchema = new Schema(
             enum: ["male", "female", "other"],
             required: function () { return ["transporter", "driver"].includes(this.type); },
         },
-        
+
         otp: {
             type: Number,
         },
@@ -115,6 +115,7 @@ const userSchema = new Schema(
         },
         vehicle: {
             type: mongoose.Schema.Types.ObjectId,
+            ref: "Vehicle",
             required: false
         },
         currentLocation: {

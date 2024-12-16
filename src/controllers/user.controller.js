@@ -13,6 +13,7 @@ import { drivingLicenceVerification } from "../utils/drivingLicenceVerification.
 import jwt from 'jsonwebtoken';
 import AWS from 'aws-sdk';
 import multer from 'multer';
+import { Vehicle } from "../models/vehicle.model.js";
 
 import { sendEmailNotification } from "../../utils/notification.js";
 
@@ -63,7 +64,7 @@ const upload = multer({
     storage,
     limits: { fileSize: 5 * 1024 * 1024 }, // Limit file size to 5MB
     fileFilter: (req, file, cb) => {
-        if (['image/jpeg', 'image/png', 'image/jpg'].includes(file.mimetype)) {
+        if (['image/jpeg', 'image/png', 'image/jpg', 'image/pdf'].includes(file.mimetype)) {
             cb(null, true);
         } else {
             cb(new ApiError(400, 'Invalid file type. Please upload an image.'), false);
@@ -75,7 +76,7 @@ const upload = multer({
 const uploadToS3 = async (buffer, fileName, mimeType) => {
     const params = {
         Bucket: process.env.AWS_BUCKET,
-        Key: `profile-images/${Date.now()}-${fileName}`, // Unique file name
+        Key: `media/${Date.now()}-${fileName}`, // Unique file name
         Body: buffer,
         ContentType: mimeType, // Dynamically set MIME type
     };
@@ -431,6 +432,8 @@ const sendOtpOnEmail = asyncHandler(async (req, res) => {
 const sendLoginOtp = asyncHandler(async (req, res) => {
     const { phoneNumber, type } = req.body;
 
+    console.log(phoneNumber, type);
+
     if (!phoneNumber || isNaN(Number(phoneNumber))) {
         throw new ApiError(400, "Please enter a valid phone number.");
     }
@@ -742,8 +745,42 @@ const updateUserLocation = asyncHandler(async (req, res) => {
     });
 });
 
+const addBroker = asyncHandler(async (req, res) => {
+    const { ownerId, vehicleNumber, brokerPhoneNumber } = req.body;
+
+    // Validate input
+    if (!ownerId || !vehicleNumber || !brokerPhoneNumber) {
+        throw new ApiError(400, "Please fill in all required details");
+    }
+
+    // Fetch the owner, vehicle, and broker concurrently
+    const [owner, vehicle, broker] = await Promise.all([
+        User.findById(ownerId),
+        Vehicle.findOne({ vehicleNumber, owner: ownerId }),
+        User.findOne({ phoneNumber: brokerPhoneNumber, type: 'broker' })
+    ]);
+
+    // console.log('ow:', owner, 'Broker: ', broker, 'vehicle : ', vehicle);
+
+    // Validate existence of records
+    if (!owner) throw new ApiError(404, "Owner not found");
+    if (!vehicle) throw new ApiError(404, "Vehicle not found");
+    if (!broker) throw new ApiError(404, "Broker not found");
+
+    // Update vehicle with broker information
+    // vehicle.broker = broker; // Ensure `broker` is properly referenced
+    // await vehicle.save();
+
+    const vehicle2 = await Vehicle.findByIdAndUpdate(vehicle._id, { broker }, { new: true });
+    console.log(vehicle2);
+    // Return success response
+    return res.status(200).json({
+        success: true,
+        message: "Broker added successfully!",
+    });
+});
 
 
 export {
-    register, sendOtpOnPhone, sendOtpOnEmail, uploadToS3, sendLoginOtp, getUserByPhoneNumber, updateUserByPhoneNumber, generateToken, verifyLoginOtp, updateUserLocation, getUserById
+    register, sendOtpOnPhone, sendOtpOnEmail, uploadToS3, sendLoginOtp, getUserByPhoneNumber, updateUserByPhoneNumber, generateToken, verifyLoginOtp, updateUserLocation, getUserById, addBroker
 }

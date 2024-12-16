@@ -7,6 +7,7 @@ import { getLocation } from "../utils/location.js";
 import tripRouter from "./routes/trip.route.js";
 import { createServer } from 'http';
 import { configureSocket } from "./webSocket.js";
+import { transactionMiddleware } from "./middlewares/transaction.middleware.js"
 
 const app = express();
 
@@ -25,9 +26,10 @@ app.use(express.urlencoded({ extended: false, limit: "20mb" }))
 app.use(express.static("public"))
 app.use(cookieParser())
 
+// app.use(transactionMiddleware);
+
 //routes declaration
-app.use("/api/v1/users", userRouter)
-app.use("/api", vehicleRoutes);
+app.use("/api/vehicles", vehicleRoutes);
 app.use("/api/v1/users", userRouter);
 app.use("/api/trips", tripRouter);
 

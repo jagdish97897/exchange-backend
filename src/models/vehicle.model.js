@@ -18,7 +18,7 @@ const vehicleSchema = new Schema(
     },
     rcCopy: {
       type: [String],
-      required: true,
+      required: false,
       validate: {
         validator: function (value) {
           return value.length > 0;
@@ -42,12 +42,12 @@ const vehicleSchema = new Schema(
       trim: true,
     },
     owner: {
-      type: Schema.Types.ObjectId,
+      type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
     },
     broker: {
-      type: Schema.Types.ObjectId,
+      type:mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: false,
     },
@@ -66,11 +66,11 @@ const vehicleSchema = new Schema(
       default: false,
     },
     tdsDeclaration: {
-      type: String,
+      type: [String],
       trim: true,
     },
     ownerConsent: {
-      type: String,
+      type: [String],
       required: false,
     },
     brokerConsent: {
@@ -78,45 +78,51 @@ const vehicleSchema = new Schema(
       required: false,
     },
     // Nested driver object
-    driver: {
-      fullName: {
-        type: String,
-        required: false,
-      },
-      profileImage: {
-        type: String,
-        required: false,
-      },
-      email: {
-        type: String,
-        required: false,
-      },
-      phoneNumber: {
-        type: String,
-        required: false,
-      },
-      aadharNumber: {
-        type: String,
-        required: false,
-      },
-      panNumber: {
-        type: String,
-        required: false,
-      },
-      dlNumber: {
-        type: String,
-        required: false,
-      },
-      dob: {
-        type: String,
-        required: false,
-      },
-      gender: {
-        type: String,
-        enum: ["male", "female", "other"],
-        required: false,
-      },
-    },
+    // driver: {
+    //   fullName: {
+    //     type: String,
+    //     required: false,
+    //   },
+    //   profileImage: {
+    //     type: String,
+    //     required: false,
+    //   },
+    //   email: {
+    //     type: String,
+    //     required: false,
+    //   },
+    //   phoneNumber: {
+    //     type: String,
+    //     required: false,
+    //   },
+    //   aadharNumber: {
+    //     type: String,
+    //     required: false,
+    //   },
+    //   panNumber: {
+    //     type: String,
+    //     required: false,
+    //   },
+    //   dlNumber: {
+    //     type: String,
+    //     required: false,
+    //   },
+    //   dob: {
+    //     type: String,
+    //     required: false,
+    //   },
+    //   gender: {
+    //     type: String,
+    //     enum: ["male", "female", "other"],
+    //     required: false,
+    //   },
+    // },
+
+    driver:{
+      type: mongoose.Schema.Types.ObjectId,
+      ref:"User",
+      required:false
+    }
   },
   {
     timestamps: true,
