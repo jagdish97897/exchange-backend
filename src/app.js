@@ -8,6 +8,7 @@ import tripRouter from "./routes/trip.route.js";
 import { createServer } from 'http';
 import { configureSocket } from "./webSocket.js";
 import { transactionMiddleware } from "./middlewares/transaction.middleware.js"
+import { ApiError } from "./utils/ApiError.js"
 
 const app = express();
 
@@ -38,6 +39,14 @@ app.post("/api/location", getLocation);
 app.get("/api/googleApiKey", (req, res) => { return res.status(200).json(process.env.GOOGLE_MAPS_API_KEY) });
 
 app.use((err, req, res, next) => {
+
+    if (err instanceof ApiError) {
+        return res.status(err.statusCode).json({
+            success: false,
+            message: err.message,
+        });
+    }
+    
     console.error(err.stack);
 
     res.status(err.status || 500);

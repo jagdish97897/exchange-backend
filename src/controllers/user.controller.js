@@ -772,7 +772,7 @@ const addBroker = asyncHandler(async (req, res) => {
     // await vehicle.save();
 
     const vehicle2 = await Vehicle.findByIdAndUpdate(vehicle._id, { broker }, { new: true });
-    console.log(vehicle2);
+    // console.log(vehicle2);
     // Return success response
     return res.status(200).json({
         success: true,
