@@ -11,12 +11,6 @@ const configureSocket = (server) => {
     io.on("connection", (socket) => {
         console.log('A client connected:', socket.id);
 
-        // // Emit message from server to user
-        // socket.emit("newMessage", {
-        //     from: "jen@mds",
-        //     text: "hepcxgvhjk",
-        //     createdAt: 123,
-        // });
 
         socket.emit("hny", {
             from: "jen",
@@ -36,7 +30,7 @@ const configureSocket = (server) => {
         });
     });
 
-    return io; // Return the io instance if needed elsewhere
+    return io; 
 };
 
 export { configureSocket };

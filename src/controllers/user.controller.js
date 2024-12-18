@@ -211,147 +211,6 @@ const register = asyncHandler(async (req, res) => {
 });
 
 
-// const register = asyncHandler(async (req, res) => {
-//     try {
-//         const {
-//             fullName,
-//             profileImage,
-//             phoneNumber,
-//             email,
-//             gstin,
-//             type,
-//             companyName,
-//             website,
-//             aadharNumber,
-//             panNumber,
-//             dob,
-//             gender,
-//             dlNumber,
-//         } = req.body;
-
-//         // Validate phone number
-//         if (!phoneNumber || isNaN(Number(phoneNumber))) {
-//             throw new ApiError(400, "Please enter a correct phone number.");
-//         }
-
-//         // Check if user already exists
-//         const existingUser = await User.findOne({ phoneNumber });
-//         if (existingUser) {
-//             throw new ApiError(400, "User with this phone number already exists.");
-//         }
-
-//         // Validate and create user based on type
-//         let userData = { fullName, profileImage, phoneNumber, email, type };
-
-//         switch (type) {
-//             case "consumer":
-//                 validateFields([fullName, phoneNumber, email, gstin, companyName, website]);
-//                 Object.assign(userData, { gstin, companyName, website });
-//                 break;
-
-//             case "transporter":
-//                 validateFields([fullName, phoneNumber, aadharNumber, panNumber, dob, gender]);
-//                 Object.assign(userData, { aadharNumber, panNumber, dob, gender });
-//                 break;
-
-//             case "owner":
-//             case "broker":
-//                 validateFields([fullName, phoneNumber, aadharNumber, panNumber]);
-//                 Object.assign(userData, { aadharNumber, panNumber });
-//                 break;
-
-//             case "driver":
-//                 validateFields([fullName, phoneNumber, aadharNumber, panNumber, dlNumber, dob, gender]);
-//                 Object.assign(userData, { aadharNumber, panNumber, dlNumber, dob, gender });
-//                 break;
-
-//             default:
-//                 throw new ApiError(400, "Invalid user type.");
-//         }
-
-//         // Create user
-//         await User.create(userData);
-
-//         return res.status(201).json({ message: "User registered successfully." });
-//     } catch (error) {
-//         // Log the error for debugging
-//         console.error("Error during registration:", error);
-
-//         // Send appropriate error response
-//         return res.status(error.statusCode || 500).json({
-//             message: error.message || "An unexpected error occurred.",
-//         });
-//     }
-// });
-
-// const register = asyncHandler(async (req, res) => {
-//     try {
-//         const { fullName, profileImage, phoneNumber, email, gstin, type, companyName, website, aadharNumber, panNumber, dob, gender, dlNumber } = req.body;
-
-//         if (!phoneNumber || isNaN(Number(phoneNumber))) {
-//             throw new ApiError(400, "Please enter a correct phone number.");
-//         }
-
-//         const existingUser = await User.findOne({ phoneNumber });
-
-//         if (existingUser) {
-//             throw new ApiError(400, "User with this phone number already exists");
-//         }
-
-//         switch (type) {
-//             case 'consumer':
-//                 validateFields([fullName, phoneNumber, email, gstin, type, companyName, website]);
-//                 // await gstVerification(gstin);
-//                 await User.create({ fullName, phoneNumber, email, gstin, type, companyName, website, profileImage });
-//                 return res.status(201).json({ message: "User registered successfully" });
-
-//             case 'transporter':
-//                 validateFields([fullName, phoneNumber, email, type, aadharNumber, panNumber, dob, gender]);
-//                 // await verifyAadharAndPAN(aadharNumber, panNumber, fullName, dob, gender, phoneNumber);
-//                 await User.create({ fullName, phoneNumber, email, type, companyName, website, aadharNumber, panNumber, profileImage, dob, gender });
-//                 return res.status(201).json({ message: "User registered successfully" });
-
-//             case 'owner':
-//             case 'broker':
-//                 validateFields([fullName, phoneNumber, type, aadharNumber, panNumber]);
-//                 // await verifyAadharAndPAN(aadharNumber, panNumber, fullName, dob, gender, phoneNumber);
-//                 await User.create({ fullName, phoneNumber, type, aadharNumber, panNumber, profileImage });
-//                 return res.status(201).json({ message: "User registered successfully" });
-
-//                 case 'driver':
-//                     // Make sure to include `dob` and `gender` in the validateFields function
-//                     validateFields([fullName, phoneNumber, type, aadharNumber, panNumber, dlNumber, dob, gender]);
-
-//                     // You can also add further verification here for Aadhar, PAN, or Driving License if needed.
-//                     // await verifyAadharAndPAN(aadharNumber, panNumber, fullName, dob, gender, phoneNumber);
-//                     // await drivingLicenceVerification(dlNumber, dob);
-
-//                     // Create the driver user with all required fields, including `dob` and `gender`
-//                     await User.create({
-//                         fullName,
-//                         phoneNumber,
-//                         type,
-//                         aadharNumber,
-//                         panNumber,
-//                         dlNumber,
-//                         profileImage,
-//                         dob,
-//                         gender 
-//                     });
-
-//                     return res.status(201).json({ message: "User registered successfully" });
-
-
-//             default:
-//                 throw new ApiError(400, "User type not found");
-//         }
-
-//     } catch (error) {
-//         throw new ApiError(400, error.message);
-//     }
-// });
-
-
 const sendOtpOnPhone = asyncHandler(async (req, res) => {
     try {
         const otp = otpGenerator.generate(4, { upperCaseAlphabets: false, lowerCaseAlphabets: false, specialChars: false });
@@ -398,37 +257,6 @@ const sendOtpOnEmail = asyncHandler(async (req, res) => {
     }
 })
 
-// async function uploadToS3(req, res) {
-
-//     if (!req.files || req.files.length === 0) {
-//         return res.status(400).send('No files uploaded.');
-//     }
-
-//     try {
-//         const uploadPromises = req.files.map((file) => {
-//             const uploadParams = {
-//                 Bucket: process.env.AWS_BUCKET,
-//                 Key: file.originalname, // Use the original file name as the S3 key
-//                 Body: file.buffer,
-//                 ContentType: file.mimetype, // Set the appropriate content type
-//             };
-
-//             return s3.upload(uploadParams).promise();
-//         });
-
-//         const results = await Promise.all(uploadPromises);
-
-//         const uploadedFiles = results.map(result => result.Location);
-//         console.log('Files uploaded successfully:', uploadedFiles);
-//         res.send(`Files uploaded successfully to: ${uploadedFiles.join(', ')}`);
-
-//     } catch (error) {
-//         console.error('Error uploading files to S3:', error);
-//         res.status(500).send('Error uploading files');
-//     }
-// }
-
-
 const sendLoginOtp = asyncHandler(async (req, res) => {
     const { phoneNumber, type } = req.body;
 
@@ -456,15 +284,6 @@ const sendLoginOtp = asyncHandler(async (req, res) => {
     user.otpExpires = Date.now() + 5 * 60 * 1000; // OTP valid for 5 minutes
     await user.save();
 
-    // Send OTP via SMS (using Fast2SMS or similar)
-    // await axios.get('https://www.fast2sms.com/dev/bulkV2', {
-    //     params: {
-    //         authorization: process.env.FAST2SMS_API_KEY,
-    //         variables_values: otp,
-    //         route: 'otp',
-    //         numbers: phoneNumber
-    //     }
-    // });
 
     return res.status(200).json(
         new ApiResponse(200, { otp }, "OTP sent successfully!")
@@ -516,77 +335,6 @@ const getUserById = asyncHandler(async (req, res) => {
         throw new ApiError(400, error.message);
     }
 });
-
-
-
-// const updateUserByPhoneNumber = asyncHandler(async (req, res) => {
-//     try {
-//         const { phoneNumber } = req.params; // Get phoneNumber from URL params
-//         const {
-//             fullName, profileImage, email, gstin, type, companyName,
-//             website, aadharNumber, panNumber, dob, gender, dlNumber
-//         } = req.body;
-
-//         // Validate phone number
-//         if (!phoneNumber || isNaN(Number(phoneNumber)) || phoneNumber.length < 10) {
-//             throw new ApiError(400, "Please enter a valid phone number.");
-//         }
-
-//         // Find user by phone number
-//         const existingUser = await User.findOne({ phoneNumber });
-
-//         if (!existingUser) {
-//             throw new ApiError(404, "User with this phone number does not exist.");
-//         }
-
-//         // Validate fields based on user type
-//         switch (existingUser.type) {
-//             case 'consumer':
-//                 validateFields([fullName, phoneNumber, email, gstin, type, companyName, website]);
-//                 break;
-//             case 'transporter':
-//                 validateFields([fullName, phoneNumber, email, type, aadharNumber, panNumber, dob, gender]);
-//                 break;
-//             case 'owner':
-//             case 'broker':
-//                 validateFields([fullName, phoneNumber, type, aadharNumber, panNumber]);
-//                 break;
-//             case 'driver':
-//                 validateFields([fullName, phoneNumber, type, aadharNumber, panNumber, dlNumber, dob]);
-//                 break;
-//             default:
-//                 throw new ApiError(400, "User type not found.");
-//         }
-
-//         // Prepare update object, only include provided fields
-//         const updateData = {};
-//         if (fullName) updateData.fullName = fullName;
-//         if (profileImage) updateData.profileImage = profileImage;
-//         if (email) updateData.email = email;
-//         if (gstin) updateData.gstin = gstin;
-//         if (type) updateData.type = type;
-//         if (companyName) updateData.companyName = companyName;
-//         if (website) updateData.website = website;
-//         if (aadharNumber) updateData.aadharNumber = aadharNumber;
-//         if (panNumber) updateData.panNumber = panNumber;
-//         if (dob) updateData.dob = dob;
-//         if (gender) updateData.gender = gender;
-//         if (dlNumber) updateData.dlNumber = dlNumber;
-
-//         // Update the user in the database
-//         const updatedUser = await User.findOneAndUpdate(
-//             { phoneNumber },
-//             updateData,
-//             { new: true }
-//         );
-
-//         return res.status(200).json({ message: "User data updated successfully", data: updatedUser });
-
-//     } catch (error) {
-//         throw new ApiError(400, error.message);
-//     }
-// });
-
 
 const updateUserByPhoneNumber = asyncHandler(async (req, res) => {
     try {
@@ -698,7 +446,7 @@ const verifyLoginOtp = asyncHandler(async (req, res) => {
     const token = generateToken(phoneNumber);
 
     return res.status(200).json(
-        new ApiResponse(200, { token, type: user.type }, "Login successful !")
+        new ApiResponse(200, { token ,type:user.type, id:user._id}, "Login successful !")
     );
 });
 
@@ -780,7 +528,63 @@ const addBroker = asyncHandler(async (req, res) => {
     });
 });
 
+ const updateUserLocation1 = asyncHandler(async (req, res) => {
+    const { userId } = req.params;
+    const { latitude, longitude } = req.body;
+
+    // Validate latitude and longitude
+    if (typeof latitude !== 'number' || typeof longitude !== 'number') {
+        throw new ApiError(400, 'Invalid location data. Latitude and longitude must be numbers.');
+    }
+
+    // Find the user by userId
+    const user = await User.findById(userId);
+    if (!user) {
+        throw new ApiError(404, 'User not found.');
+    }
+
+    // Update the user's currentLocation
+    user.currentLocation = { latitude, longitude };
+
+    // Save the updated user data
+    await user.save();
+
+    return res.status(200).json({
+        message: 'User location updated successfully',
+        user: {
+            id: user._id,
+            currentLocation: user.currentLocation
+        }
+    });
+});
+
+ const updateStatus = async (req, res) => {
+    const { userId } = req.params;
+    const { status } = req.body;
+
+    if (!status || !["online", "offline"].includes(status)) {
+        return res.status(400).json({ message: "Valid status is required." });
+    }
+
+    try {
+        const user = await User.findByIdAndUpdate(
+            userId,
+            { status },
+            { new: true }
+        );
+
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        res.status(200).json({ message: "Status updated successfully", user });
+    } catch (error) {
+        console.error("Error updating status:", error);
+        res.status(500).json({ message: "Error updating status", error });
+    }
+};
+
 
 export {
-    register, sendOtpOnPhone, sendOtpOnEmail, uploadToS3, sendLoginOtp, getUserByPhoneNumber, updateUserByPhoneNumber, generateToken, verifyLoginOtp, updateUserLocation, getUserById, addBroker
+    register, sendOtpOnPhone, sendOtpOnEmail, uploadToS3, sendLoginOtp, getUserByPhoneNumber, updateUserByPhoneNumber, generateToken, verifyLoginOtp, updateUserLocation, getUserById, updateUserLocation1, updateStatus,addBroker
 }

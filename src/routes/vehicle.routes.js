@@ -3,7 +3,8 @@ import {
     addVehicle,
     getVehiclesByOwnerId,
     updateVehicleByNumber,
-    getVehicleByNumber
+    getVehicleByNumber,
+    getAllVehicles
 } from "../controllers/vehicle.controller.js";
 import { upload } from "../middlewares/multer.middleware.js";
 
@@ -23,6 +24,8 @@ router.post(
 router.get("/owner/:ownerId", getVehiclesByOwnerId);
 router.put("/update/:vehicleNumber", updateVehicleByNumber);
 router.get("/:vehicleNumber", getVehicleByNumber);
+router.get("/all", getAllVehicles);
+
 // router.get("/vehicles", getAllVehicles);
 // router.get("/vehicles/:id", getVehicleById);
 // router.put("/vehicles/:id", updateVehicle);
