@@ -414,14 +414,14 @@ const updateUserByPhoneNumber = asyncHandler(async (req, res) => {
 
 
 
-const generateToken = (phoneNumber) => {
+const generateToken = (userId) => {
     let jwtSecretKey = process.env.JWT_SECRET_KEY;
     let data = {
         time: Date(),
-        phoneNumber,
+        userId,
     }
 
-    const token = jwt.sign(data, jwtSecretKey);
+    const token = jwt.sign(data, jwtSecretKey, { expiresIn: '1h' });
 
     return token;
 }
@@ -443,7 +443,7 @@ const verifyLoginOtp = asyncHandler(async (req, res) => {
         throw new ApiError(400, 'Invalid OTP');
     }
 
-    const token = generateToken(phoneNumber);
+    const token = generateToken(user._id);
 
     return res.status(200).json(
         new ApiResponse(200, { token ,type:user.type, id:user._id}, "Login successful !")

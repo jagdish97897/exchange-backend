@@ -51,15 +51,22 @@ const vehicleSchema = new Schema(
       ref: "User",
       required: false,
     },
-    latitude: {
-      type: Number,
-      min: -90,
-      max: 90,
-    },
-    longitude: {
-      type: Number,
-      min: -180,
-      max: 180,
+    // latitude: {
+    //   type: Number,
+    //   min: -90,
+    //   max: 90,
+    // },
+    // longitude: {
+    //   type: Number,
+    //   min: -180,
+    //   max: 180,
+    // },
+    location: {
+      type: { type: String, default: "Point" },
+      coordinates: {
+        type: [Number], // [longitude, latitude]
+        required: true,
+      },
     },
     biddingAuthorization: {
       type: Boolean,
@@ -128,6 +135,9 @@ const vehicleSchema = new Schema(
     timestamps: true,
   }
 );
+
+vehicleSchema.index({ location: "2dsphere" });
+
 export const Vehicle = mongoose.model("Vehicle", vehicleSchema);
 
 

@@ -160,7 +160,10 @@ export const addVehicle = async (req, res) => {
       driverDlNumber,
       driverDob,
       driverGender,
+      currentLocation
     } = req.body;
+
+    const parsedCurrentLocation = currentLocation ? JSON.parse(currentLocation) : null;
 
     // Check required fields
     if (!vehicleNumber || !vehicleHeight || !vehicleWidth || !vehicleLength || !ownerId) {
@@ -169,6 +172,7 @@ export const addVehicle = async (req, res) => {
 
     // Validate owner
     const owner = await User.findById(ownerId).session(session);
+
     if (!owner) {
       throw new Error("Owner not found");
     }
@@ -184,10 +188,12 @@ export const addVehicle = async (req, res) => {
       width: vehicleWidth,
       length: vehicleLength,
       owner,
-      latitude: 24,
-      longitude: 24,
       tdsDeclaration: uploadedFiles["tdsDeclaration"].map((r) => r),
       ownerConsent: uploadedFiles["ownerConsent"].map((r) => r),
+      location: {
+        type: 'Point',
+        coordinates: [parsedCurrentLocation.latitude, parsedCurrentLocation.longitude]
+      },
     };
 
     const vehicle = await Vehicle.create([{ ...vehicleData }], { session });
@@ -304,7 +310,44 @@ export const getVehicleByNumber = async (req, res) => {
 
     res.status(200).json({ message: "Vehicle fetched successfully", vehicle });
   } catch (error) {
-    console.error("Error fetching vehicle:", error);
-    res.status(500).json({ message: error.message || "Server error" });
+    console.log("Error fetching vehicle:", error);
+    return res.status(500).json({ message: error.message || "Server error" });
   }
 };
+
+export const updateVehicleLocation = async (req, res) => {
+  try {
+    const { currentLocation, driverPhoneNumber } = req.body;
+
+    // Assuming `User` is the model for the referenced "User" collection
+    const driver = await User.findOne({ phoneNumber: driverPhoneNumber, type: 'driver' });
+
+    if (driver) {
+      const vehicle = await Vehicle.findOneAndUpdate(
+        { driver: driver._id }, // Match the vehicle with this driver's _id
+        {
+          location: {
+            type: "Point",
+            coordinates: [currentLocation.longitude, currentLocation.latitude],
+          },
+        },
+        { new: true } // Return the updated document
+      );
+
+      if (vehicle) {
+        console.log("Vehicle location updated:");
+      } else {
+        console.log("No vehicle found for the provided driver.");
+      }
+    } else {
+      console.log("No driver found with the provided phone number.");
+    }
+
+    return res.status(200).json({ success: true, message: 'Location updated !' });
+
+  } catch (error) {
+    console.log("Error fetching vehicle:", error);
+    return res.status(500).json({ message: error.message || "Server error" });
+  }
+
+}
