@@ -121,16 +121,8 @@ const createTrip = asyncHandler(async (req, res) => {
             }, []); // Initialize accumulator as an empty array
 
             // console.log(userIds);
-            const message = {
-                from,
-                to,
-                phoneNumber,
-                tripDate: tripDate || new Date(),
-                payloadCost: cargoDetails.payloadCost,
-                tripId: trip._id
-            };
 
-            const promises = userIds.map(userId => emitNewMessage(userId, message));
+            const promises = userIds.map(userId => emitNewMessage(userId, trip));
 
             await Promise.all(promises);
         }

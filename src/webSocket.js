@@ -44,7 +44,7 @@ const configureSocket = (server) => {
 };
 
 // Utility function to emit a new message
-const emitNewMessage = async (userId, message) => {
+const emitNewMessage = async (userId, trip) => {
     if (!io) {
         console.error("Socket.io is not initialized.");
         return;
@@ -58,13 +58,10 @@ const emitNewMessage = async (userId, message) => {
     try {
         const roomName = `user-${userId}`;
         const existingSockets = await io.in(roomName).fetchSockets();
-        console.log(existingSockets,'exist')
+        console.log(existingSockets, 'exist')
 
         if (existingSockets.length) {
-            io.to(roomName).emit("newTrip", {
-                sender: userId,
-                message,
-            });
+            io.to(roomName).emit("newTrip", trip);
             console.log(`Message sent to room: ${roomName}`);
         } else {
             console.warn(`Room ${roomName} does not exist.`);

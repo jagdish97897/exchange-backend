@@ -16,7 +16,7 @@ router.route("/verify/aadhar").post(aadharVerification)
 router.route("/upload").post(upload.array('files', 5), uploadToS3);
 
 router.route("/sendOtp").post(sendLoginOtp)
-router.get('/user/:phoneNumber', getUserByPhoneNumber);
+router.get('/:phoneNumber', getUserByPhoneNumber);
 router.get('/userid/:id', getUserById);
 // router.put('/updateuser/:phoneNumber', updateUserByPhoneNumber);
 router.put('/updateuser/:phoneNumber', upload.single("profileImage"), updateUserByPhoneNumber);

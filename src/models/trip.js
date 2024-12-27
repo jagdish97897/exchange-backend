@@ -31,10 +31,12 @@ const tripSchema = new Schema({
             payloadCost: {
                 type: Number,
                 required: true,
+                min: 0, // Ensure positive values
             },
             payloadWeight: {
                 type: Number,
                 required: true, // in tonnes
+                min: 0, // Ensure positive values
             },
             payloadHeight: {
                 type: Number,
@@ -70,14 +72,34 @@ const tripSchema = new Schema({
     },
     currentLocation: {
         type: {
-            latitude: {
-                type: Number,
+            latitude: { type: Number, default: 0 },
+            longitude: { type: Number, default: 0 },
+        },
+        required: false, // It's optional
+    },
+    counterPriceList: [
+        {
+            counterPrice: { type: Number },
+            user: {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'User'
             },
-            longitude: {
-                type: Number
-            }
         }
+    ],
+    RevisedPrice: {
+        type: {
+            counterPrice: { type: Number },
+            user: {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'User'
+            }
+        },
     }
 });
 
+tripSchema.index({ tripDate: 1 });
+
 export const Trip = mongoose.model("Trip", tripSchema);
+
+// consumer -> quote price  :: driver -> Counter Price ,
+// consumer -> rebid price :: driver -> Revised Price
