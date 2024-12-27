@@ -122,12 +122,12 @@ const createTrip = asyncHandler(async (req, res) => {
 
             // console.log(userIds);
             const message = {
-                user,
                 from,
                 to,
+                phoneNumber,
                 tripDate: tripDate || new Date(),
-                cargoDetails,
-                specialInstruction,
+                payloadCost: cargoDetails.payloadCost,
+                tripId: trip._id
             };
 
             const promises = userIds.map(userId => emitNewMessage(userId, message));
