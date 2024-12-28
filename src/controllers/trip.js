@@ -6,6 +6,7 @@ import axios from "axios";
 import { Vehicle } from "../models/vehicle.model.js";
 import { server } from '../app.js';
 import { emitNewMessage, configureSocket } from "../webSocket.js";
+import { ApiError } from "../utils/ApiError.js";
 
 const getDistance = asyncHandler(async (req, res) => {
     const { to, from } = req.query;
@@ -214,6 +215,71 @@ const createTripPayment = asyncHandler(async (req, res) => {
     return res.status(200).json({ trip, message: 'Trip payment updated successfully.' })
 });
 
+const updateCounterPrice = asyncHandler(async (req, res) => {
+    const { userId, counterPrice, tripId } = req.body;
+
+    // Validate inputs
+    if (!userId || !tripId || !counterPrice) {
+        throw new ApiError(400, "Required fields: userId, tripId, counterPrice");
+    }
+
+    // Fetch trip and user data concurrently
+    const [user, trip] = await Promise.all([
+        User.findById(userId),
+        Trip.findById(tripId),
+    ]);
+
+    if (!user) {
+        throw new ApiError(404, "User not found");
+    }
+
+    if (!trip) {
+        throw new ApiError(404, "Trip not found");
+    }
+
+    // Update trip counter price list
+    trip.counterPriceList.push({ counterPrice, user });
+
+    await trip.save();
+
+    return res.status(200).json({
+        success: true,
+        message: "Counter price updated successfully!",
+    });
+});
+
+const updateRevisedPrice = asyncHandler(async (req, res) => {
+    const { userId, revisedPrice, tripId } = req.body;
+
+    // Validate inputs
+    if (!userId || !tripId || !revisedPrice) {
+        throw new ApiError(400, "Required fields: userId, tripId, counterPrice");
+    }
+
+    // Fetch trip and user data concurrently
+    const [user, trip] = await Promise.all([
+        User.findById(userId),
+        Trip.findById(tripId),
+    ]);
+
+    if (!user) {
+        throw new ApiError(404, "User not found");
+    }
+
+    if (!trip) {
+        throw new ApiError(404, "Trip not found");
+    }
+
+    // Update trip counter price list
+    trip.revisedPrice = { amount: revisedPrice, vspUser: user };
+
+    await trip.save();
+
+    return res.status(200).json({
+        success: true,
+        message: "Revised price updated successfully!",
+    });
+});
 
 
-export { createTrip, getTripDetails, getAllTrips, getCustomerAllTrips, createTripPayment, updateTripStatus, getDistance };
+export { createTrip, getTripDetails, getAllTrips, getCustomerAllTrips, createTripPayment, updateTripStatus, getDistance, updateCounterPrice, updateRevisedPrice };

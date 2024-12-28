@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createTrip, getTripDetails, getAllTrips, getCustomerAllTrips, createTripPayment, updateTripStatus, getDistance } from "../controllers/trip.js";
+import { createTrip, getTripDetails, getAllTrips, getCustomerAllTrips, createTripPayment, updateTripStatus, getDistance, updateCounterPrice, updateRevisedPrice } from "../controllers/trip.js";
 
 
 const router = Router();
@@ -11,5 +11,7 @@ router.route("/:tripId").get(getTripDetails);
 router.route("/:tripId/status").put(updateTripStatus);
 router.route("/customer/:userId").get(getCustomerAllTrips);
 router.route("/:tripId/payment").post(createTripPayment);
+router.route("/counterPrice").patch(updateCounterPrice);
+router.route("/revisedPrice").patch(updateRevisedPrice);
 
 export default router;

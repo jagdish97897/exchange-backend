@@ -86,16 +86,16 @@ const tripSchema = new Schema({
             },
         }
     ],
-    RevisedPrice: {
+    revisedPrice: {
         type: {
-            counterPrice: { type: Number },
-            user: {
+            amount: { type: Number },
+            vspUser: {
                 type: mongoose.Schema.Types.ObjectId,
                 ref: 'User'
             }
         },
     }
-});
+}, { timestamps: true });
 
 tripSchema.index({ tripDate: 1 });
 
