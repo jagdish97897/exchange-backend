@@ -123,7 +123,7 @@ const createTrip = asyncHandler(async (req, res) => {
 
             // console.log(userIds);
 
-            const promises = userIds.map(userId => emitNewMessage(userId, trip));
+            const promises = userIds.map(userId => emitNewMessage("newTrip", userId, trip));
 
             await Promise.all(promises);
         }
@@ -241,6 +241,15 @@ const updateCounterPrice = asyncHandler(async (req, res) => {
     trip.counterPriceList.push({ counterPrice, user });
 
     await trip.save();
+
+    await emitNewMessage("counterPrice", trip.user._id, {
+        name: user.fullName,
+        phoneNumber: user.phoneNumber,
+        counterPrice: counterPrice || trip.cargoDetails.payloadCost,
+        userId: user._id
+    })
+
+    console.log('Counter Price Submitted:', counterPrice);
 
     return res.status(200).json({
         success: true,
