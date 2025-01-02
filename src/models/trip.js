@@ -28,7 +28,7 @@ const tripSchema = new Schema({
                 type: String,
                 required: true,
             },
-            payloadCost: {
+            quotePrice: {
                 type: Number,
                 required: true,
                 min: 0, // Ensure positive values
@@ -100,6 +100,3 @@ const tripSchema = new Schema({
 tripSchema.index({ tripDate: 1 });
 
 export const Trip = mongoose.model("Trip", tripSchema);
-
-// consumer -> quote price  :: driver -> Counter Price ,
-// consumer -> rebid price :: driver -> Revised Price

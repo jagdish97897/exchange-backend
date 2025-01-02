@@ -178,7 +178,9 @@ const updateTripStatus = asyncHandler(async (req, res) => {
 const getTripDetails = asyncHandler(async (req, res) => {
     const { tripId } = req.params;
     validateFields([tripId]);
-    const trip = await Trip.findById(tripId);
+    const trip = await Trip.findById(tripId)
+        .populate("counterPriceList.user", "fullName phoneNumber")
+        .populate("revisedPrice.vspUser", "fullName phoneNumber");
 
     return res.status(200).json({ trip, message: 'Trip details found successfully' })
 });
@@ -245,7 +247,7 @@ const updateCounterPrice = asyncHandler(async (req, res) => {
     await emitNewMessage("counterPrice", trip.user._id, {
         name: user.fullName,
         phoneNumber: user.phoneNumber,
-        counterPrice: counterPrice || trip.cargoDetails.payloadCost,
+        counterPrice: counterPrice || trip.cargoDetails.quotePrice,
         userId: user._id
     })
 
@@ -284,11 +286,46 @@ const updateRevisedPrice = asyncHandler(async (req, res) => {
 
     await trip.save();
 
+    await emitNewMessage("revisedPrice", user._id, trip);
+
     return res.status(200).json({
         success: true,
         message: "Revised price updated successfully!",
     });
 });
 
+const getRevisedPrice = asyncHandler(async (req, res) => {
+    const { tripId } = req.body;
 
-export { createTrip, getTripDetails, getAllTrips, getCustomerAllTrips, createTripPayment, updateTripStatus, getDistance, updateCounterPrice, updateRevisedPrice };
+    if (!tripId) {
+        throw new ApiError(404, "Trip id not found");
+    }
+
+    const trip = await Trip.findById(tripId);
+
+    if (!trip) {
+        throw new ApiError(404, "Trip not found");
+    }
+
+    return res.status(404).json({ success: true, revisedPrice: trip.revisedPrice })
+
+});
+
+const getCounterPrice = asyncHandler(async (req, res) => {
+    const { tripId } = req.body;
+
+    if (!tripId) {
+        throw new ApiError(404, "Trip id not found");
+    }
+
+    const trip = await Trip.findById(tripId);
+
+    if (!trip) {
+        throw new ApiError(404, "Trip not found");
+    }
+
+    return res.status(404).json({ success: true, counterPriceList: trip.counterPriceList })
+});
+
+
+export { createTrip, getTripDetails, getAllTrips, getCustomerAllTrips, createTripPayment, updateTripStatus, getDistance, updateCounterPrice, updateRevisedPrice, getRevisedPrice, getCounterPrice };
