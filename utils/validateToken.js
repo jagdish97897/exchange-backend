@@ -3,8 +3,8 @@ import 'dotenv/config';
 
 export function isValidToken(token) {
     try {
-        // console.log("JWT Secret Key:", process.env.JWT_SECRET_KEY);
-
+        console.log("JWT Secret Key:", process.env.JWT_SECRET_KEY);
+        console.log('token', token)
         // Verify the token using the secret key
         const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
 

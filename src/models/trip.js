@@ -6,12 +6,10 @@ const tripSchema = new Schema({
         ref: "User",
         required: true,
     },
-
     from: {
         type: String,
         required: true,
     },
-
     to: {
         type: String,
         required: true,
@@ -28,7 +26,7 @@ const tripSchema = new Schema({
                 type: String,
                 required: true,
             },
-            payloadCost: {
+            quotePrice: {
                 type: Number,
                 required: true,
                 min: 0, // Ensure positive values
@@ -85,16 +83,16 @@ const tripSchema = new Schema({
             },
         }
     ],
-    RevisedPrice: {
+    revisedPrice: {
         type: {
-            counterPrice: { type: Number },
-            user: {
+            amount: { type: Number },
+            vspUser: {
                 type: mongoose.Schema.Types.ObjectId,
                 ref: 'User'
             }
         },
     }
-});
+}, { timestamps: true });
 
 tripSchema.index({ tripDate: 1 });
 
