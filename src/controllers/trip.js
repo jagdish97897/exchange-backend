@@ -54,7 +54,7 @@ const createTrip = asyncHandler(async (req, res) => {
             tripDate: tripDate || new Date(),
             cargoDetails,
             specialInstruction,
-            status: 'created',
+            status: 'cancelled',
             amount: 0,
             currentLocation
         });
