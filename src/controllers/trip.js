@@ -61,36 +61,6 @@ const createTrip = asyncHandler(async (req, res) => {
         const data = await getCoordinatesFromPincode(from);
 
         if (data.latitude && data.longitude) {
-            // const vehicles = await Vehicle.aggregate([
-            //     {
-            //         $geoNear: {
-            //             near: { type: "Point", coordinates: [data.latitude, data.longitude] },
-            //             distanceField: "distance",
-            //             spherical: true,
-            //             maxDistance: 100000, // 100 Kms
-            //         },
-            //     },
-            //     // {
-            //     //     $lookup: {
-            //     //         from: "users", // Name of the collection for the User model
-            //     //         localField: "driver",
-            //     //         foreignField: "_id",
-            //     //         as: "driverDetails",
-            //     //     },
-            //     // },
-            //     // {
-            //     //     $lookup: {
-            //     //         from: "users", // Name of the collection for the User model
-            //     //         localField: "owner",
-            //     //         foreignField: "_id",
-            //     //         as: "ownerDetails",
-            //     //     },
-            //     // },
-            //     {
-            //         $sort: { distance: 1 },
-            //     },
-            // ]);
-
 
             const nearbyVehicles = await Vehicle.find({
                 location: {
@@ -156,10 +126,6 @@ const getCoordinatesFromPincode = async (pincode) => {
     }
 };
 
-// Usage
-// getCoordinatesFromPincode('110001')
-//     .then(coords => console.log('Coordinates:', coords))
-//     .catch(err => console.error(err));
 
 const updateTripStatus = asyncHandler(async (req, res) => {
     const { status } = req.body;
@@ -168,7 +134,7 @@ const updateTripStatus = asyncHandler(async (req, res) => {
     const trip = await Trip.findByIdAndUpdate(
         tripId,
         { status },
-        { new: true, runValidators: true } // Enables validation and returns the updated document  
+        { new: true, runValidators: true }  
     );
 
     return res.status(200).json({ trip, message: 'Trip status updated successfully' })
@@ -204,10 +170,6 @@ const createTripPayment = asyncHandler(async (req, res) => {
     const { tripId } = req.params;
 
     validateFields([tripId, amount]);
-
-    // use Razorpay for payment
-    // verify payment
-    // then update trip amount
 
     const trip = await Trip.findByIdAndUpdate(tripId, { amount }, { new: true });
 

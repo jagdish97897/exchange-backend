@@ -62,10 +62,9 @@ const tripSchema = new Schema({
     status: {
         type: String,
         enum: ["created", "inProgress", "completed", "cancelled"],
-        default: "created", // Default status
+        default: "created", 
         required: true,
     },
-
     amount: {
         type: Number,
         required: false,
@@ -75,7 +74,7 @@ const tripSchema = new Schema({
             latitude: { type: Number, default: 0 },
             longitude: { type: Number, default: 0 },
         },
-        required: false, // It's optional
+        required: false, 
     },
     counterPriceList: [
         {
@@ -100,6 +99,7 @@ const tripSchema = new Schema({
 tripSchema.index({ tripDate: 1 });
 
 export const Trip = mongoose.model("Trip", tripSchema);
+
 
 // consumer -> quote price  :: driver -> Counter Price ,
 // consumer -> rebid price :: driver -> Revised Price

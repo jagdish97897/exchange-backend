@@ -1,12 +1,12 @@
 import { Server } from "socket.io";
 import { isValidToken } from "../utils/validateToken.js";
 
-let io; // Declare the io instance
+let io; 
 
 const configureSocket = (server) => {
     io = new Server(server, {
         cors: {
-            origin: "*", // Replace with your client URL
+            origin: "*", 
         },
     });
 
