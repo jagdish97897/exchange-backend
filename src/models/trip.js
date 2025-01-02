@@ -83,16 +83,32 @@ const tripSchema = new Schema({
             },
         }
     ],
-    revisedPrice: {
-        type: {
-            amount: { type: Number },
-            vspUser: {
-                type: mongoose.Schema.Types.ObjectId,
-                ref: 'User'
-            }
+    // Track the sequence of bids
+    bids: [
+        {
+            price: { type: Number, required: true }, // Bid amount
+            user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }, // Who made the bid
+            role: { type: String, enum: ["consumer", "driver"], required: true }, // Role of the bidder
+            timestamp: { type: Date, default: Date.now }, // When the bid was made
         },
-    }
-}, { timestamps: true });
+    ],
+
+    // Final agreed price and related details
+    finalPrice: {
+        type: Number,
+        required: false, // Set when the bidding process is complete
+    },
+
+    // Status of the bidding process
+    biddingStatus: {
+        type: String,
+        enum: ["inProgress", "accepted", "rejected"],
+        default: "inProgress",
+    },
+},
+    { timestamps: true }
+);
+
 
 tripSchema.index({ tripDate: 1 });
 

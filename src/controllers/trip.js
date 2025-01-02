@@ -145,8 +145,8 @@ const getTripDetails = asyncHandler(async (req, res) => {
     const { tripId } = req.params;
     validateFields([tripId]);
     const trip = await Trip.findById(tripId)
-        .populate("counterPriceList.user", "fullName phoneNumber")
-        .populate("revisedPrice.vspUser", "fullName phoneNumber");
+        .populate("counterPriceList.user", "fullName phoneNumber");
+        // .populate("revisedPrice.vspUser", "fullName phoneNumber");
 
     return res.status(200).json({ trip, message: 'Trip details found successfully' })
 });
@@ -221,17 +221,18 @@ const updateCounterPrice = asyncHandler(async (req, res) => {
     });
 });
 
-const updateRevisedPrice = asyncHandler(async (req, res) => {
-    const { userId, revisedPrice, tripId } = req.body;
+const updateBidPrice = asyncHandler(async (req, res) => {
+    const { userId, vspUserId, price, tripId } = req.body;
 
     // Validate inputs
-    if (!userId || !tripId || !revisedPrice) {
+    if (!vspUserId || !tripId || !price) {
         throw new ApiError(400, "Required fields: userId, tripId, counterPrice");
     }
 
     // Fetch trip and user data concurrently
-    const [user, trip] = await Promise.all([
+    const [user, vspUser, trip] = await Promise.all([
         User.findById(userId),
+        User.findById(vspUserId),
         Trip.findById(tripId),
     ]);
 
@@ -239,16 +240,29 @@ const updateRevisedPrice = asyncHandler(async (req, res) => {
         throw new ApiError(404, "User not found");
     }
 
+    if (!vspUser) {
+        throw new ApiError(404, "VSP not found");
+    }
+
     if (!trip) {
         throw new ApiError(404, "Trip not found");
     }
 
     // Update trip counter price list
-    trip.revisedPrice = { amount: revisedPrice, vspUser: user };
+    // trip.bids = [...trip.bids, { price, user, role: user.type, timestamp: new Date() }];
+
+    trip.bids.push({ price, user, role: user.type, timestamp: new Date() });
+
 
     await trip.save();
 
+    // if vsp is updating bid price
+    if (vspUser._id === user._id) {
+        await emitNewMessage("counterPrice", trip.user._id, trip);
+    }
+
     await emitNewMessage("revisedPrice", user._id, trip);
+
 
     return res.status(200).json({
         success: true,
@@ -256,7 +270,7 @@ const updateRevisedPrice = asyncHandler(async (req, res) => {
     });
 });
 
-const getRevisedPrice = asyncHandler(async (req, res) => {
+const getBidPrice = asyncHandler(async (req, res) => {
     const { tripId } = req.body;
 
     if (!tripId) {
@@ -269,7 +283,7 @@ const getRevisedPrice = asyncHandler(async (req, res) => {
         throw new ApiError(404, "Trip not found");
     }
 
-    return res.status(404).json({ success: true, revisedPrice: trip.revisedPrice })
+    return res.status(404).json({ success: true, bids: trip.bids });
 
 });
 
@@ -289,5 +303,35 @@ const getCounterPrice = asyncHandler(async (req, res) => {
     return res.status(404).json({ success: true, counterPriceList: trip.counterPriceList })
 });
 
+const acceptOrRejectBidRequest = asyncHandler(async (req, res) => {
+    const { tripId, vspUserId, status } = req.body;
 
-export { createTrip, getTripDetails, getAllTrips, getCustomerAllTrips, createTripPayment, updateTripStatus, getDistance, updateCounterPrice, updateRevisedPrice, getRevisedPrice, getCounterPrice };
+    // Validate input fields
+    if (!tripId || !vspUserId) {
+        return res.status(400).json({ message: "Trip ID and VSP Id are required." });
+    }
+
+    // Find the trip by ID
+    const trip = await Trip.findById(tripId);
+    if (!trip) {
+        return res.status(404).json({ message: "Trip not found." });
+    }
+
+    // Check if the driver exists in the lastbidder array using phoneNumber
+    const lastBid = trip.bids[trip.bids.length - 1];
+
+    // Update the trip status and preserve the lastbidder data
+    trip.biddingStatus = status; // Set the status to completed
+    trip.finalPrice = lastBid.price; // Keep only the accepted driver in the lastbidder list
+
+    // Save the updated trip
+    await trip.save();
+
+    // Respond with success
+    return res.status(200).json({
+        trip,
+        message: `Bid status updated successfully.`,
+    });
+});
+
+export { createTrip, getTripDetails, getAllTrips, getCustomerAllTrips, createTripPayment, updateTripStatus, getDistance, updateCounterPrice, updateBidPrice, getBidPrice, getCounterPrice, acceptOrRejectBidRequest };
