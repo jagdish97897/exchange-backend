@@ -54,49 +54,10 @@ const createTrip = asyncHandler(async (req, res) => {
             tripDate: tripDate || new Date(),
             cargoDetails,
             specialInstruction,
-            status: 'cancelled',
+            status: 'created',
             amount: 0,
             currentLocation
         });
-
-        const data = await getCoordinatesFromPincode(from);
-
-        if (data.latitude && data.longitude) {
-
-            const nearbyVehicles = await Vehicle.find({
-                location: {
-                    $near: {
-                        $geometry: {
-                            type: "Point",
-                            coordinates: [data.latitude, data.longitude], //  Latitude, Longitude
-                        },
-                        $maxDistance: 10000000, // 10 kilometers
-                    },
-                },
-            })
-                .populate("driver", "fullName phoneNumber") // Populate specific fields from the User model
-                .populate("owner", "fullName email"); // Populate specific fields from the User model
-
-            // console.log('nearbyVehicles : ', nearbyVehicles);
-
-            const userIds = nearbyVehicles.reduce((acc, value) => {
-                if (value.owner && value.owner._id) {
-                    acc.push(value.owner._id); // Add owner ID to the accumulator
-                }
-
-                if (value.driver && value.driver._id) {
-                    acc.push(value.driver._id); // Add driver ID to the accumulator
-                }
-
-                return acc; // Return the updated accumulator
-            }, []); // Initialize accumulator as an empty array
-
-            // console.log(userIds);
-
-            const promises = userIds.map(userId => emitNewMessage("newTrip", userId, trip));
-
-            await Promise.all(promises);
-        }
 
         return res.status(200).json({ tripId: trip._id, status: 'created', message: 'Trip request has been received.' });
     } catch (error) {
@@ -104,6 +65,142 @@ const createTrip = asyncHandler(async (req, res) => {
     };
 });
 
+
+
+const updateTrip = asyncHandler(async (req, res) => {
+    try {
+        const { tripId } = req.params; // Extract trip ID from route params
+        const { from, to, tripDate, cargoDetails, specialInstruction, currentLocation } = req.body; // Extract fields to update
+        console.log('cargo ', cargoDetails);
+        // Validate that at least one field to update is provided
+        if (!from && !to && !tripDate && !cargoDetails && !specialInstruction && !currentLocation) {
+            throw new ApiError(400, 'No fields provided for update');
+        }
+
+        // Find the trip and update its fields
+        const updatedTrip = await Trip.findByIdAndUpdate(
+            tripId,
+            {
+                ...(from && { from }),
+                ...(to && { to }),
+                ...(tripDate && { tripDate }),
+                ...(cargoDetails && {
+                    cargoDetails: {
+                        cargoType: cargoDetails.cargoType,
+                        quotePrice: cargoDetails.quotePrice,
+                        payloadWeight: cargoDetails.payloadWeight,
+                        payloadHeight: cargoDetails.payloadHeight,
+                        payloadLength: cargoDetails.payloadLength,
+                        payloadWidth: cargoDetails.payloadWidth,
+                    }
+                }),
+                ...(specialInstruction && { specialInstruction }),
+                // ...(currentLocation && { currentLocation }),
+            },
+            { new: true } // Return the updated trip
+        );
+
+        if (!updatedTrip) {
+            throw new ApiError(404, 'Trip not found');
+        }
+
+        return res.status(200).json({
+            message: 'Trip updated successfully',
+            trip: updatedTrip,
+        });
+    } catch (error) {
+        console.error('Error updating trip:', error);
+        throw new ApiError(500, 'Failed to update trip');
+    }
+});
+
+
+const handleStartBidding = asyncHandler(async (req, res) => {
+    const { tripId } = req.params;
+    const trip = await Trip.findById(tripId);
+
+    if (!trip) {
+        throw new ApiError(400, 'Trip not found!');
+    }
+
+    trip.biddingStatus = 'inProgress';
+    trip.biddingStartTime = new Date();
+
+    await trip.save();
+
+    const data = await getCoordinatesFromPincode(trip.from);
+
+    if (data.latitude && data.longitude) {
+        // const vehicles = await Vehicle.aggregate([
+        //     {
+        //         $geoNear: {
+        //             near: { type: "Point", coordinates: [data.latitude, data.longitude] },
+        //             distanceField: "distance",
+        //             spherical: true,
+        //             maxDistance: 100000, // 100 Kms
+        //         },
+        //     },
+        //     // {
+        //     //     $lookup: {
+        //     //         from: "users", // Name of the collection for the User model
+        //     //         localField: "driver",
+        //     //         foreignField: "_id",
+        //     //         as: "driverDetails",
+        //     //     },
+        //     // },
+        //     // {
+        //     //     $lookup: {
+        //     //         from: "users", // Name of the collection for the User model
+        //     //         localField: "owner",
+        //     //         foreignField: "_id",
+        //     //         as: "ownerDetails",
+        //     //     },
+        //     // },
+        //     {
+        //         $sort: { distance: 1 },
+        //     },
+        // ]);
+
+        const nearbyVehicles = await Vehicle.find({
+            location: {
+                $near: {
+                    $geometry: {
+                        type: "Point",
+                        coordinates: [data.latitude, data.longitude], //  Latitude, Longitude
+                    },
+                    $maxDistance: 10000000, // 10 kilometers
+                },
+            },
+        })
+            .populate("driver", "fullName phoneNumber") // Populate specific fields from the User model
+            .populate("owner", "fullName email"); // Populate specific fields from the User model
+
+        // console.log('nearbyVehicles : ', nearbyVehicles);
+
+        const userIds = nearbyVehicles.reduce((acc, value) => {
+            if (value.owner && value.owner._id) {
+                acc.push(value.owner._id); // Add owner ID to the accumulator
+            }
+
+            if (value.driver && value.driver._id) {
+                acc.push(value.driver._id); // Add driver ID to the accumulator
+            }
+
+            return acc; // Return the updated accumulator
+        }, []); // Initialize accumulator as an empty array
+
+        // console.log(userIds);
+
+        const promises = userIds.map(userId => emitNewMessage("newTrip", userId, trip));
+
+        await Promise.all(promises);
+
+        return res.status(200).json({ success: true, message: 'Bidding started successfully' });
+    }
+
+    return res.status(400).json({ success: false, message: 'Bidding not started', trip });
+
+})
 
 const getCoordinatesFromPincode = async (pincode) => {
     const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${pincode}&key=${process.env.GOOGLE_MAPS_API_KEY}`;
@@ -135,7 +232,7 @@ const updateTripStatus = asyncHandler(async (req, res) => {
     const trip = await Trip.findByIdAndUpdate(
         tripId,
         { status },
-        { new: true, runValidators: true }  
+        { new: true, runValidators: true }
     );
 
     return res.status(200).json({ trip, message: 'Trip status updated successfully' })
@@ -146,7 +243,7 @@ const getTripDetails = asyncHandler(async (req, res) => {
     validateFields([tripId]);
     const trip = await Trip.findById(tripId)
         .populate("counterPriceList.user", "fullName phoneNumber");
-        // .populate("revisedPrice.vspUser", "fullName phoneNumber");
+    // .populate("revisedPrice.vspUser", "fullName phoneNumber");
 
     return res.status(200).json({ trip, message: 'Trip details found successfully' })
 });
@@ -161,7 +258,7 @@ const getCustomerAllTrips = asyncHandler(async (req, res) => {
 });
 
 const getAllTrips = asyncHandler(async (req, res) => {
-    const trips = await Trip.find();
+    const trips = await Trip.find({ biddingStatus: { $ne: 'notStarted' } });
     if (!trips || trips.length === 0) {
         return res.status(404).json({ message: "No trips found" });
     }
@@ -247,7 +344,12 @@ const updateBidPrice = asyncHandler(async (req, res) => {
     if (!trip) {
         throw new ApiError(404, "Trip not found");
     }
-
+    console.log(trip)
+    if (!trip.bids.length) {
+        const counterPriceObj = trip.counterPriceList.find(list => list.user.toString() === vspUserId);
+        trip.bids.push({ price: counterPriceObj.counterPrice, user: vspUser, role: vspUser.type, timestamp: new Date() });
+        trip.bidder = vspUser;
+    }
     // Update trip counter price list
     // trip.bids = [...trip.bids, { price, user, role: user.type, timestamp: new Date() }];
 
@@ -267,6 +369,7 @@ const updateBidPrice = asyncHandler(async (req, res) => {
     return res.status(200).json({
         success: true,
         message: "Revised price updated successfully!",
+        trip
     });
 });
 
@@ -318,11 +421,15 @@ const acceptOrRejectBidRequest = asyncHandler(async (req, res) => {
     }
 
     // Check if the driver exists in the lastbidder array using phoneNumber
-    const lastBid = trip.bids[trip.bids.length - 1];
+    const lastBidPrice = trip.bids.length ?
+        trip.bids[trip.bids.length - 1].price
+        :
+        trip.counterPriceList.find(list => list.user.toString() === vspUserId).counterPrice;
 
     // Update the trip status and preserve the lastbidder data
-    trip.biddingStatus = status; // Set the status to completed
-    trip.finalPrice = lastBid.price; // Keep only the accepted driver in the lastbidder list
+    trip.status = status;
+    trip.biddingStatus = 'accepted' // Set the status to completed
+    trip.finalPrice = lastBidPrice; // Keep only the accepted driver in the lastbidder list
 
     // Save the updated trip
     await trip.save();
@@ -334,4 +441,4 @@ const acceptOrRejectBidRequest = asyncHandler(async (req, res) => {
     });
 });
 
-export { createTrip, getTripDetails, getAllTrips, getCustomerAllTrips, createTripPayment, updateTripStatus, getDistance, updateCounterPrice, updateBidPrice, getBidPrice, getCounterPrice, acceptOrRejectBidRequest };
+export { createTrip, getTripDetails, getAllTrips, getCustomerAllTrips, createTripPayment, updateTripStatus, getDistance, updateCounterPrice, updateBidPrice, getBidPrice, getCounterPrice, acceptOrRejectBidRequest, updateTrip, handleStartBidding };

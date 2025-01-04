@@ -102,9 +102,19 @@ const tripSchema = new Schema({
     // Status of the bidding process
     biddingStatus: {
         type: String,
-        enum: ["inProgress", "accepted", "rejected"],
-        default: "inProgress",
+        enum: ["notStarted", "inProgress", "accepted", "rejected"],
+        default: "notStarted",
     },
+
+    biddingStartTime: {
+        type: Date,
+        default: new Date()
+    },
+
+    bidder: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+    }
 },
     { timestamps: true }
 );
