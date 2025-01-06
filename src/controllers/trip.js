@@ -258,7 +258,15 @@ const getCustomerAllTrips = asyncHandler(async (req, res) => {
 });
 
 const getAllTrips = asyncHandler(async (req, res) => {
-    const trips = await Trip.find({ biddingStatus: { $ne: 'notStarted' } });
+    const trips = await Trip.find({
+        biddingStatus: { $eq: 'inProgress' },
+        $expr: {
+            $lt: [
+                new Date(), // Current time
+                { $add: ['$biddingStartTime', 1000 * 60 * 30] } // Add 30 minutes to biddingStartTime
+            ]
+        }
+    });
     if (!trips || trips.length === 0) {
         return res.status(404).json({ message: "No trips found" });
     }
@@ -315,6 +323,7 @@ const updateCounterPrice = asyncHandler(async (req, res) => {
     return res.status(200).json({
         success: true,
         message: "Counter price updated successfully!",
+        trip
     });
 });
 
@@ -415,9 +424,13 @@ const acceptOrRejectBidRequest = asyncHandler(async (req, res) => {
     }
 
     // Find the trip by ID
-    const trip = await Trip.findById(tripId);
+    const [trip, vspUser] = await Promise.all([Trip.findById(tripId), User.findById(vspUserId)]);
     if (!trip) {
         return res.status(404).json({ message: "Trip not found." });
+    }
+
+    if (!trip.bidder) {
+        trip.bidder = vspUser;
     }
 
     // Check if the driver exists in the lastbidder array using phoneNumber
@@ -441,4 +454,15 @@ const acceptOrRejectBidRequest = asyncHandler(async (req, res) => {
     });
 });
 
-export { createTrip, getTripDetails, getAllTrips, getCustomerAllTrips, createTripPayment, updateTripStatus, getDistance, updateCounterPrice, updateBidPrice, getBidPrice, getCounterPrice, acceptOrRejectBidRequest, updateTrip, handleStartBidding };
+const getAcceptedBidTrips = asyncHandler(async (req, res) => {
+    const { userId } = req.params;
+    const trips = await Trip.find({ bidder: userId });
+
+    if (!trips) {
+        throw new ApiError(400, 'Trip not found');
+    }
+
+    return res.status(200).json({ trips, success: true, message: 'Trip found successfully' });
+})
+
+export { createTrip, getTripDetails, getAllTrips, getCustomerAllTrips, createTripPayment, updateTripStatus, getDistance, updateCounterPrice, updateBidPrice, getBidPrice, getCounterPrice, acceptOrRejectBidRequest, updateTrip, handleStartBidding, getAcceptedBidTrips };

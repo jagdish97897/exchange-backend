@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createTrip, getTripDetails, getAllTrips, getCustomerAllTrips, createTripPayment, updateTripStatus, getDistance, updateCounterPrice, updateBidPrice, getCounterPrice, getBidPrice, acceptOrRejectBidRequest, updateTrip, handleStartBidding } from "../controllers/trip.js";
+import { createTrip, getTripDetails, getAllTrips, getCustomerAllTrips, createTripPayment, updateTripStatus, getDistance, updateCounterPrice, updateBidPrice, getCounterPrice, getBidPrice, acceptOrRejectBidRequest, updateTrip, handleStartBidding, getAcceptedBidTrips } from "../controllers/trip.js";
 
 
 const router = Router();
@@ -18,5 +18,6 @@ router.route("/:tripId/revisedPrice").get(getBidPrice);
 router.route("/bidStatus").patch(acceptOrRejectBidRequest);
 router.route("/:tripId").patch(updateTrip);
 router.route("/:tripId/startBidding").post(handleStartBidding);
+router.route("/:userId/acceptedBidTrips").get(getAcceptedBidTrips);
 
 export default router;
