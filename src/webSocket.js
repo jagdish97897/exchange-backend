@@ -1,12 +1,12 @@
 import { Server } from "socket.io";
 import { isValidToken } from "../utils/validateToken.js";
 
-let io; 
+let io;
 
 const configureSocket = (server) => {
     io = new Server(server, {
         cors: {
-            origin: "*", 
+            origin: "*",
         },
     });
 
@@ -58,11 +58,11 @@ const emitNewMessage = async (event, userId, trip) => {
     try {
         const roomName = `user-${userId}`;
         const existingSockets = await io.in(roomName).fetchSockets();
-        console.log(existingSockets, 'exist')
+        // console.log(existingSockets, 'exist')
 
         if (existingSockets.length) {
             io.to(roomName).emit(event, trip);
-            console.log(`Message sent to room: ${roomName}`);
+            console.log(`${event} Message sent to room: ${roomName}`);
         } else {
             console.warn(`Room ${roomName} does not exist.`);
         }

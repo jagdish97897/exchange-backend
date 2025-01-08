@@ -7,6 +7,7 @@ import { Vehicle } from "../models/vehicle.model.js";
 import { server } from '../app.js';
 import { emitNewMessage, configureSocket } from "../webSocket.js";
 import { ApiError } from "../utils/ApiError.js";
+import cron from 'node-cron';
 
 const getDistance = asyncHandler(async (req, res) => {
     const { to, from } = req.query;
@@ -268,7 +269,7 @@ const getAllTrips = asyncHandler(async (req, res) => {
         }
     });
     if (!trips || trips.length === 0) {
-        return res.status(404).json({ message: "No trips found" });
+        return res.status(400).json({ message: "No trips found" });
     }
     return res.status(200).json({ trips, message: 'Trip details found successfully' });
 });
@@ -306,8 +307,14 @@ const updateCounterPrice = asyncHandler(async (req, res) => {
         throw new ApiError(404, "Trip not found");
     }
 
+    console.log('Trip counter:', trip);
+
+    if (trip.bids.length > 0 && trip.bidder.toString() === userId) {
+        trip.bids.push({ price: counterPrice, user, role: user.type, timestamp: new Date() });
+    } else {
+        trip.counterPriceList.push({ counterPrice, user });
+    }
     // Update trip counter price list
-    trip.counterPriceList.push({ counterPrice, user });
 
     await trip.save();
 
@@ -327,7 +334,7 @@ const updateCounterPrice = asyncHandler(async (req, res) => {
     });
 });
 
-const updateBidPrice = asyncHandler(async (req, res) => {
+const updateRevisedPrice = asyncHandler(async (req, res) => {
     const { userId, vspUserId, price, tripId } = req.body;
 
     // Validate inputs
@@ -367,12 +374,12 @@ const updateBidPrice = asyncHandler(async (req, res) => {
 
     await trip.save();
 
-    // if vsp is updating bid price
-    if (vspUser._id === user._id) {
-        await emitNewMessage("counterPrice", trip.user._id, trip);
-    }
+    // // if vsp is updating bid price
+    // if (vspUser._id === user._id) {
+    //     await emitNewMessage("counterPrice", trip.user._id, trip);
+    // }
 
-    await emitNewMessage("revisedPrice", user._id, trip);
+    await emitNewMessage("revisedPrice", vspUserId, trip);
 
 
     return res.status(200).json({
@@ -463,6 +470,38 @@ const getAcceptedBidTrips = asyncHandler(async (req, res) => {
     }
 
     return res.status(200).json({ trips, success: true, message: 'Trip found successfully' });
+});
+
+const changeTripStatus = async () => {
+    const result = await Trip.updateMany(
+        {
+            biddingStatus: { $eq: 'inProgress' },
+            $expr: {
+                $gt: [
+                    new Date(), // Current time
+                    { $add: ['$biddingStartTime', 1000 * 60 * 30] } // Add 30 minutes to biddingStartTime
+                ]
+            }
+        },
+        {
+            $set: {
+                biddingStatus: 'rejected',
+                status: 'cancelled'
+            }
+        }
+    );
+
+    return { result, message: 'Trip status changed successfully' };
+
+};
+
+cron.schedule('* * * * *', async (params) => {
+    try {
+        const response = await changeTripStatus();
+        console.log(response);
+    } catch (error) {
+        console.error('Error updating ULIP token:', error);
+    }
 })
 
-export { createTrip, getTripDetails, getAllTrips, getCustomerAllTrips, createTripPayment, updateTripStatus, getDistance, updateCounterPrice, updateBidPrice, getBidPrice, getCounterPrice, acceptOrRejectBidRequest, updateTrip, handleStartBidding, getAcceptedBidTrips };
+export { createTrip, getTripDetails, getAllTrips, getCustomerAllTrips, createTripPayment, updateTripStatus, getDistance, updateCounterPrice, updateRevisedPrice, getBidPrice, getCounterPrice, acceptOrRejectBidRequest, updateTrip, handleStartBidding, getAcceptedBidTrips, changeTripStatus };
