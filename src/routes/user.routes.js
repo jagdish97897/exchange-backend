@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { register, sendOtpOnPhone, sendOtpOnEmail, uploadToS3, sendLoginOtp, getUserByPhoneNumber,addBroker, getUserById,updateUserByPhoneNumber, verifyLoginOtp, updateUserLocation, updateUserLocation1, updateStatus  } from "../controllers/user.controller.js";
+import { register, sendOtpOnPhone, sendOtpOnEmail, uploadImages, sendLoginOtp, getUserByPhoneNumber,addBroker, getUserById,updateUserByPhoneNumber, verifyLoginOtp, updateUserLocation, updateUserLocation1, updateStatus  } from "../controllers/user.controller.js";
 import { upload } from "../middlewares/multer.middleware.js";
 // import { verifyJWT } from "../middlewares/auth.middleware.js";
 import { gstVerification } from "../utils/gstinVerification.js";
@@ -13,13 +13,13 @@ router.route("/sendOtp/email").post(sendOtpOnEmail)
 router.route("/verify/gst").post(gstVerification)
 router.route("/verify/aadhar").post(aadharVerification)
 // router.route("/login").get(loginConsumer);
-router.route("/upload").post(upload.array('files', 5), uploadToS3);
+router.route("/upload").post(upload.single('file'), uploadImages);
 
 router.route("/sendOtp").post(sendLoginOtp)
 router.get('/:phoneNumber', getUserByPhoneNumber);
 router.get('/userid/:id', getUserById);
 // router.put('/updateuser/:phoneNumber', updateUserByPhoneNumber);
-router.put('/updateuser/:phoneNumber', upload.single("profileImage"), updateUserByPhoneNumber);
+router.put('/updateuser/:phoneNumber', updateUserByPhoneNumber);
 
 router.route("/verifyOtp").post(verifyLoginOtp);
 router.route("/location").put(updateUserLocation);

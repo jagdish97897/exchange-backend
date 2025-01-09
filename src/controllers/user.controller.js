@@ -22,7 +22,6 @@ export function validateFields(fields) {
     if (fields.some((field) => field.trim() === "")) {
         throw new ApiError(400, "All fields are required and must be valid strings");
     }
-
 }
 
 async function verifyAadharAndPAN(aadharNumber, panNumber, fullName, dob, gender, phoneNumber) {
@@ -83,6 +82,7 @@ const uploadToS3 = async (buffer, fileName, mimeType) => {
 
     try {
         const s3Data = await s3.upload(params).promise();
+        console.log('s3Data.Location', s3Data.Location);
         return s3Data.Location; // Return the uploaded file's URL
     } catch (error) {
         console.error('Error uploading to S3:', error);
@@ -339,6 +339,7 @@ const getUserById = asyncHandler(async (req, res) => {
 const updateUserByPhoneNumber = asyncHandler(async (req, res) => {
     try {
         const { phoneNumber } = req.params;
+        console.log('req body ',req.body);
         const {
             fullName, profileImage, email, gstin, type, companyName,
             website, aadharNumber, panNumber, dob, gender, dlNumber
@@ -388,15 +389,16 @@ const updateUserByPhoneNumber = asyncHandler(async (req, res) => {
         if (dob) updateData.dob = dob;
         if (gender) updateData.gender = gender;
         if (dlNumber) updateData.dlNumber = dlNumber;
-        // if (profileImage) updateData.profileImage = profileImage;
+        if (profileImage) updateData.profileImage = profileImage;
 
         // console.log('file gfgfgfgfg ', req.file);
         // If a new profile image is provided, update it
-        if (req.file) {
-            const profileImageUrl = await uploadToS3(req.file.buffer, req.file.originalname, req.file.type);
+        // if (req.file) {
+        //     console.log('File ************: ', req.file)
+        //     const profileImageUrl = await uploadToS3(req.file.buffer, req.file.originalname, req.file.type);
 
-            updateData.profileImage = [profileImageUrl]; // Save image URL in the profileImage array
-        }
+        //     updateData.profileImage = [profileImageUrl]; // Save image URL in the profileImage array
+        // }
 
         // Update the user in the database
         const updatedUser = await User.findOneAndUpdate(
@@ -446,7 +448,7 @@ const verifyLoginOtp = asyncHandler(async (req, res) => {
     const token = generateToken(user._id);
 
     return res.status(200).json(
-        new ApiResponse(200, { token ,type:user.type, id:user._id}, "Login successful !")
+        new ApiResponse(200, { token, type: user.type, id: user._id }, "Login successful !")
     );
 });
 
@@ -528,7 +530,7 @@ const addBroker = asyncHandler(async (req, res) => {
     });
 });
 
- const updateUserLocation1 = asyncHandler(async (req, res) => {
+const updateUserLocation1 = asyncHandler(async (req, res) => {
     const { userId } = req.params;
     const { latitude, longitude } = req.body;
 
@@ -558,7 +560,7 @@ const addBroker = asyncHandler(async (req, res) => {
     });
 });
 
- const updateStatus = async (req, res) => {
+const updateStatus = async (req, res) => {
     const { userId } = req.params;
     const { status } = req.body;
 
@@ -584,7 +586,28 @@ const addBroker = asyncHandler(async (req, res) => {
     }
 };
 
+const uploadImages = async (req, res) => {
+    try {
+        if (!req.file) return;
+
+        // console.log('req file', req.file);
+        const fileUrl = await uploadToS3(req.file.buffer, req.file.originalname, req.file.mimetype);
+
+        // fileUrls.push(s3Data.Location);
+        // Loop through each uploaded file and upload to S3
+        // for (let file of req.files) {
+        //     const s3Data = await uploadToS3(file.buffer, file.originalname, file.mimetype);
+        //     fileUrls.push(s3Data.Location);  // Save the S3 image URL
+        // }
+
+        return res.status(200).json({ success: true, fileUrl });
+    } catch (error) {
+        console.error('Error uploading to S3:', error);
+        throw new ApiError(500, 'Error uploading image to S3');
+    }
+};
+
 
 export {
-    register, sendOtpOnPhone, sendOtpOnEmail, uploadToS3, sendLoginOtp, getUserByPhoneNumber, updateUserByPhoneNumber, generateToken, verifyLoginOtp, updateUserLocation, getUserById, updateUserLocation1, updateStatus,addBroker
+    register, sendOtpOnPhone, sendOtpOnEmail, uploadToS3, sendLoginOtp, getUserByPhoneNumber, updateUserByPhoneNumber, generateToken, verifyLoginOtp, updateUserLocation, getUserById, updateUserLocation1, updateStatus, addBroker, uploadImages
 }
