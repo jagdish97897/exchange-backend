@@ -339,7 +339,7 @@ const getUserById = asyncHandler(async (req, res) => {
 const updateUserByPhoneNumber = asyncHandler(async (req, res) => {
     try {
         const { phoneNumber } = req.params;
-        console.log('req body ',req.body);
+        // console.log('req body ', req.body);
         const {
             fullName, profileImage, email, gstin, type, companyName,
             website, aadharNumber, panNumber, dob, gender, dlNumber
@@ -588,19 +588,22 @@ const updateStatus = async (req, res) => {
 
 const uploadImages = async (req, res) => {
     try {
-        if (!req.file) return;
+        // if (!req.file || !req.files) return;
 
-        // console.log('req file', req.file);
-        const fileUrl = await uploadToS3(req.file.buffer, req.file.originalname, req.file.mimetype);
+        const files = req.file ? [req.file] : req.files;
+
+        console.log(' file Array', files);
+        const fileUrls = [];
 
         // fileUrls.push(s3Data.Location);
-        // Loop through each uploaded file and upload to S3
-        // for (let file of req.files) {
-        //     const s3Data = await uploadToS3(file.buffer, file.originalname, file.mimetype);
-        //     fileUrls.push(s3Data.Location);  // Save the S3 image URL
-        // }
 
-        return res.status(200).json({ success: true, fileUrl });
+        // Loop through each uploaded file and upload to S3
+        for (let file of files) {
+            const fileUrl = await uploadToS3(file.buffer, file.originalname, file.mimetype);
+            fileUrls.push(fileUrl);  // Save the S3 image URL
+        }
+        // console.log('file urls', fileUrls);
+        return res.status(200).json({ success: true, fileUrl: fileUrls });
     } catch (error) {
         console.error('Error uploading to S3:', error);
         throw new ApiError(500, 'Error uploading image to S3');

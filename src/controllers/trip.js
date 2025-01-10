@@ -296,7 +296,7 @@ const updateCounterPrice = asyncHandler(async (req, res) => {
     // Fetch trip and user data concurrently
     const [user, trip] = await Promise.all([
         User.findById(userId),
-        Trip.findById(tripId),
+        Trip.findById(tripId).populate('counterPriceList.user'),
     ]);
 
     if (!user) {
