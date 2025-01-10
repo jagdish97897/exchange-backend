@@ -129,7 +129,8 @@ const userSchema = new Schema(
                     required: true
                 },
             },
-        }
+        },
+        bidAccepted: { type: Boolean, default: false }
     },
     {
         timestamps: true,

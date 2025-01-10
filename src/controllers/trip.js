@@ -259,6 +259,14 @@ const getCustomerAllTrips = asyncHandler(async (req, res) => {
 });
 
 const getAllTrips = asyncHandler(async (req, res) => {
+    const { userId } = req.params;
+
+    const user = await User.findOne({ _id: userId, bidAccepted: true });
+
+    if (user) {
+        return res.status(200).json({ trips: [], message: 'Thank you ! You have accepted a bid. Continue your journey safely!', bidAccepted: user.bidAccepted });
+    }
+
     const trips = await Trip.find({
         biddingStatus: { $eq: 'inProgress' },
         $expr: {
@@ -451,8 +459,10 @@ const acceptOrRejectBidRequest = asyncHandler(async (req, res) => {
     trip.biddingStatus = 'accepted' // Set the status to completed
     trip.finalPrice = lastBidPrice; // Keep only the accepted driver in the lastbidder list
 
+    vspUser.bidAccepted = true;
     // Save the updated trip
     await trip.save();
+    await vspUser.save();
 
     // Respond with success
     return res.status(200).json({

@@ -5,7 +5,7 @@ import { createTrip, getTripDetails, getAllTrips, getCustomerAllTrips, createTri
 const router = Router();
 
 router.route("/create").post(createTrip);
-router.route("/history").get(getAllTrips);
+router.route("/history/:userId").get(getAllTrips);
 router.route("/distance").get(getDistance);
 router.route("/:tripId").get(getTripDetails);
 router.route("/:tripId/status").put(updateTripStatus);
