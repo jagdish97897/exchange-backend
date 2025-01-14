@@ -26,7 +26,6 @@ router.get("/owner/:ownerId", getVehiclesByOwnerId);
 router.put("/update/:vehicleNumber", updateVehicleByNumber);
 router.get("/:vehicleNumber", getVehicleByNumber);
 // router.get("/all", getAllVehicles);
-
 // router.get("/vehicles", getAllVehicles);
 // router.get("/vehicles/:id", getVehicleById);
 router.patch("/location", updateVehicleLocation);

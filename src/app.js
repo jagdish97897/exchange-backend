@@ -3,6 +3,7 @@ import cors from "cors"
 import cookieParser from "cookie-parser"
 import userRouter from './routes/user.routes.js'
 import vehicleRoutes from "./routes/vehicle.routes.js"
+import walletRoutes from "./routes/wallet.routes.js"
 import { getLocation } from "../utils/location.js";
 import tripRouter from "./routes/trip.route.js";
 import { createServer } from 'http';
@@ -33,6 +34,12 @@ app.use(cookieParser())
 app.use("/api/vehicles", vehicleRoutes);
 app.use("/api/v1/users", userRouter);
 app.use("/api/trips", tripRouter);
+app.use("/api/wallet", walletRoutes);
+
+app.get("/api/getkey", (req, res) =>
+    res.status(200).json({ key: process.env.RAZORPAY_API_KEY })
+);
+
 
 app.post("/api/location", getLocation);
 
