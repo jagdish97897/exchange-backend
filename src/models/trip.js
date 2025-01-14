@@ -31,6 +31,7 @@ const tripSchema = new Schema({
                 required: true,
                 min: 0, // Ensure positive values
             },
+            reducedQuotePrice: { type: Number },
             payloadWeight: {
                 type: Number,
                 required: true, // in tonnes
@@ -60,7 +61,7 @@ const tripSchema = new Schema({
     status: {
         type: String,
         enum: ["created", "inProgress", "completed", "cancelled"],
-        default: "created", 
+        default: "created",
         required: true,
     },
     amount: {
@@ -72,11 +73,12 @@ const tripSchema = new Schema({
             latitude: { type: Number, default: 0 },
             longitude: { type: Number, default: 0 },
         },
-        required: false, 
+        required: false,
     },
     counterPriceList: [
         {
             counterPrice: { type: Number },
+            increasedCounterPrice: { type: Number },
             user: {
                 type: mongoose.Schema.Types.ObjectId,
                 ref: 'User'
@@ -87,6 +89,8 @@ const tripSchema = new Schema({
     bids: [
         {
             price: { type: Number, required: true }, // Bid amount
+            increasedPrice: { type: Number },
+            reducedPrice: { type: Number },
             user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }, // Who made the bid
             role: { type: String, enum: ["consumer", "driver"], required: true }, // Role of the bidder
             timestamp: { type: Date, default: Date.now }, // When the bid was made
@@ -119,11 +123,31 @@ const tripSchema = new Schema({
     { timestamps: true }
 );
 
+tripSchema.pre("save", function (next) {
+    // Calculate reducedQuotePrice for cargoDetails
+    if (this.cargoDetails && this.cargoDetails.quotePrice) {
+        this.cargoDetails.reducedQuotePrice = this.cargoDetails.quotePrice - (10 / 100) * this.cargoDetails.quotePrice;
+    }
+
+    // Calculate increasedCounterPrice for each counterPriceList item
+    this.counterPriceList.forEach((item) => {
+        if (item.counterPrice) {
+            item.increasedCounterPrice = item.counterPrice + (10 / 100) * item.counterPrice;
+        }
+    });
+
+    // Calculate reduced and increased prices for bids
+    this.bids.forEach((bid) => {
+        if (bid.price) {
+            bid.reducedPrice = bid.price - (10 / 100) * bid.price;
+            bid.increasedPrice = bid.price + (10 / 100) * bid.price;
+        }
+    });
+
+    next();
+});
+
 
 tripSchema.index({ tripDate: 1 });
 
 export const Trip = mongoose.model("Trip", tripSchema);
-
-
-// consumer -> quote price  :: driver -> Counter Price ,
-// consumer -> rebid price :: driver -> Revised Price

@@ -279,7 +279,7 @@ const getAllTrips = asyncHandler(async (req, res) => {
     if (!trips || trips.length === 0) {
         return res.status(400).json({ message: "No trips found" });
     }
-    return res.status(200).json({ trips, message: 'Trip details found successfully' });
+    return res.status(200).json({ trips, message: 'Trip details found successfully', bidAccepted: false });
 });
 
 const createTripPayment = asyncHandler(async (req, res) => {
