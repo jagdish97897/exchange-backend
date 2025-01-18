@@ -2,9 +2,10 @@ import express from "express";
 import { 
   checkout, 
   paymentVerification, 
+  paymentVerificationforWithdraw,
   addAmountToWallet,
   getTransactionHistory,
-  getBalance
+  getBalance,
 } from "../controllers/wallet.controller.js";
 
 import { asyncHandler } from "../utils/asyncHandler.js";
@@ -20,6 +21,8 @@ router.post("/checkout", checkout);
 // Route for verifying Razorpay payment and saving details
 router.post("/paymentVerification", paymentVerification);
 
+router.post("/paymentVerificationforWithdraw", paymentVerificationforWithdraw);
+
 // Route for adding an amount to the wallet
 router.post("/addAmountToWallet", addAmountToWallet);
 
@@ -29,15 +32,30 @@ router.get("/wallet/:userId/transactions", getTransactionHistory);
 // Route for getting balance
 router.get("/wallet/:userId/balance", getBalance);
 
-// Helper function to find or create a wallet
+
+const generateWalletCardNumber = async () => {
+  let cardNumber;
+  let exists = true;
+
+  do {
+    cardNumber = Math.floor(100000000000 + Math.random() * 900000000000).toString();
+    exists = await Wallet.findOne({ walletCardNumber: cardNumber });
+  } while (exists);
+
+  return cardNumber;
+};
+
+
 const getOrCreateWallet = async (userId) => {
   let wallet = await Wallet.findOne({ userId });
   if (!wallet) {
-    wallet = new Wallet({ userId, balance: 0 });
+    const walletCardNumber = await generateWalletCardNumber(); // Generate the card number
+    wallet = new Wallet({ userId, balance: 0, walletCardNumber });
     await wallet.save();
   }
   return wallet;
 };
+
 
 // Route for getting or creating a wallet
 router.get(
@@ -65,13 +83,12 @@ router.get(
   })
 );
 
-// Route for explicitly creating a wallet
+
 router.post(
   "/wallet/create",
   asyncHandler(async (req, res) => {
     const { userId } = req.body;
 
-    // Validate userId
     if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
       throw new ApiError(400, "Invalid or missing userId.");
     }
@@ -86,7 +103,9 @@ router.post(
         });
       }
 
-      const wallet = new Wallet({ userId, balance: 0 });
+      const walletCardNumber = await generateWalletCardNumber(); // Generate the card number
+      const wallet = new Wallet({ userId, balance: 0, walletCardNumber });
+
       await wallet.save();
 
       return res.status(201).json({
@@ -100,6 +119,8 @@ router.post(
     }
   })
 );
+
+
 
 export default router;
 

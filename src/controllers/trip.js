@@ -1,13 +1,172 @@
-import { Trip } from "../models/trip.js";
+
 import { User } from "../models/user.model.js";
-import { asyncHandler } from "../utils/asyncHandler.js";
 import { validateFields } from "./user.controller.js";
 import axios from "axios";
 import { Vehicle } from "../models/vehicle.model.js";
 import { server } from '../app.js';
 import { emitNewMessage, configureSocket } from "../webSocket.js";
-import { ApiError } from "../utils/ApiError.js";
 import cron from 'node-cron';
+
+
+import crypto from "crypto";
+import mongoose from "mongoose";
+import Wallet from "../models/wallet.model.js";
+import { Trip } from "../models/trip.js"; // Assuming Trip is imported from its model
+import { asyncHandler } from "../utils/asyncHandler.js";
+import { ApiError } from "../utils/ApiError.js";
+
+
+
+const paymentVerificationForTrip = asyncHandler(async (req, res) => {
+    const { userId, tripId, amount, razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+  
+    // Validate required fields
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      throw new ApiError(400, "Invalid or missing userId.");
+    }
+    if (!amount || isNaN(amount) || Number(amount) <= 0) {
+      throw new ApiError(400, "Invalid amount. Please provide a positive number.");
+    }
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+      throw new ApiError(400, "Missing required payment fields: orderId, paymentId, signature.");
+    }
+  
+    try {
+      // Generate and compare signatures
+      const body = `${razorpay_order_id}|${razorpay_payment_id}`;
+      const expectedSignature = crypto
+        .createHmac("sha256", process.env.RAZORPAY_API_SECRET)
+        .update(body)
+        .digest("hex");
+  
+      if (razorpay_signature !== expectedSignature) {
+        console.error("Invalid payment signature", { razorpay_payment_id, expectedSignature });
+        throw new ApiError(400, "Invalid payment signature.");
+      }
+  
+      // Find the Trip document
+      console.log(`Searching for trip with ID: ${tripId}`);
+      const trip = await Trip.findById(tripId);
+  
+      if (!trip) {
+        console.error(`Trip not found for tripId: ${tripId}`);
+        throw new ApiError(404, "Trip not found.");
+      }
+  
+      // Check if finalPrice exists
+      if (!trip.finalPrice || trip.finalPrice <= 0) {
+        throw new ApiError(400, "Final price is not set for this trip.");
+      }
+  
+      // Add transaction without modifying the finalPrice
+      trip.transactions.push({
+        amount: Number(amount),
+        type: "credit",
+        razorpay_order_id,
+        razorpay_payment_id,
+        razorpay_signature,
+      });
+
+        trip.status = "inProgress";
+  
+      // Save the updated Trip document
+      await trip.save();
+  
+      return res.status(200).json({
+        success: true,
+        message: "Payment verified and trip transaction updated successfully.",
+        transactions: trip.transactions,
+        remainingFinalPrice: trip.finalPrice,  
+      });
+    } catch (error) {
+      console.error("Error during payment verification:", error);
+      throw new ApiError(
+        error.statusCode || 500,
+        error.message || "Internal server error during payment verification."
+      );
+    }
+  });
+  
+  
+// const paymentVerificationForTrip = asyncHandler(async (req, res) => {
+//     const { userId, tripId, amount, razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+  
+//     // Validate required fields
+//     if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+//       throw new ApiError(400, "Invalid or missing userId.");
+//     }
+//     if (!amount || isNaN(amount) || Number(amount) <= 0) {
+//       throw new ApiError(400, "Invalid amount. Please provide a positive number.");
+//     }
+//     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+//       throw new ApiError(400, "Missing required payment fields: orderId, paymentId, signature.");
+//     }
+  
+//     try {
+//       // Generate and compare signatures
+//       const body = `${razorpay_order_id}|${razorpay_payment_id}`;
+//       const expectedSignature = crypto
+//         .createHmac("sha256", process.env.RAZORPAY_API_SECRET)
+//         .update(body)
+//         .digest("hex");
+  
+//       if (razorpay_signature !== expectedSignature) {
+//         console.error("Invalid payment signature", { razorpay_payment_id, expectedSignature });
+//         throw new ApiError(400, "Invalid payment signature.");
+//       }
+  
+//       // Find the Trip document
+//       console.log(`Searching for trip with ID: ${tripId}`);
+//       const trip = await Trip.findById(tripId);
+  
+//       if (!trip) {
+//         console.error(`Trip not found for tripId: ${tripId}`);
+//         throw new ApiError(404, "Trip not found.");
+//       }
+  
+//       // Check if finalPrice exists
+//       if (!trip.finalPrice || trip.finalPrice <= 0) {
+//         throw new ApiError(400, "Final price is not set for this trip.");
+//       }
+  
+//       // Deduct the amount from finalPrice
+//       trip.finalPrice -= Number(amount);
+  
+//       // Prevent negative finalPrice
+//       if (trip.finalPrice < 0) {
+//         console.error("Payment amount exceeds final price.");
+//         throw new ApiError(400, "Payment amount exceeds the remaining final price.");
+//       }
+  
+//       // Add transaction
+//       trip.transactions.push({
+//         amount: Number(amount),
+//         type: "credit",
+//         razorpay_order_id,
+//         razorpay_payment_id,
+//         razorpay_signature,
+//       });
+  
+//       // Save the updated Trip document
+//       await trip.save();
+  
+//       return res.status(200).json({
+//         success: true,
+//         message: "Payment verified, trip transaction updated, and final price adjusted successfully.",
+//         transactions: trip.transactions,
+//         remainingFinalPrice: trip.finalPrice,
+//       });
+//     } catch (error) {
+//       console.error("Error during payment verification:", error);
+//       throw new ApiError(
+//         error.statusCode || 500,
+//         error.message || "Internal server error during payment verification."
+//       );
+//     }
+//   });
+  
+
+
 
 const getDistance = asyncHandler(async (req, res) => {
     const { to, from } = req.query;
@@ -71,7 +230,7 @@ const createTrip = asyncHandler(async (req, res) => {
 const updateTrip = asyncHandler(async (req, res) => {
     try {
         const { tripId } = req.params; // Extract trip ID from route params
-        const { from, to, tripDate, cargoDetails, specialInstruction, currentLocation } = req.body; // Extract fields to update
+        const { from, to, tripDate, cargoDetails, specialInstruction, currentLocation } = req.body; 
         console.log('cargo ', cargoDetails);
         // Validate that at least one field to update is provided
         if (!from && !to && !tripDate && !cargoDetails && !specialInstruction && !currentLocation) {
@@ -132,35 +291,7 @@ const handleStartBidding = asyncHandler(async (req, res) => {
     const data = await getCoordinatesFromPincode(trip.from);
 
     if (data.latitude && data.longitude) {
-        // const vehicles = await Vehicle.aggregate([
-        //     {
-        //         $geoNear: {
-        //             near: { type: "Point", coordinates: [data.latitude, data.longitude] },
-        //             distanceField: "distance",
-        //             spherical: true,
-        //             maxDistance: 100000, // 100 Kms
-        //         },
-        //     },
-        //     // {
-        //     //     $lookup: {
-        //     //         from: "users", // Name of the collection for the User model
-        //     //         localField: "driver",
-        //     //         foreignField: "_id",
-        //     //         as: "driverDetails",
-        //     //     },
-        //     // },
-        //     // {
-        //     //     $lookup: {
-        //     //         from: "users", // Name of the collection for the User model
-        //     //         localField: "owner",
-        //     //         foreignField: "_id",
-        //     //         as: "ownerDetails",
-        //     //     },
-        //     // },
-        //     {
-        //         $sort: { distance: 1 },
-        //     },
-        // ]);
+
 
         const nearbyVehicles = await Vehicle.find({
             location: {
@@ -514,4 +645,6 @@ cron.schedule('* * * * *', async (params) => {
     }
 })
 
-export { createTrip, getTripDetails, getAllTrips, getCustomerAllTrips, createTripPayment, updateTripStatus, getDistance, updateCounterPrice, updateRevisedPrice, getBidPrice, getCounterPrice, acceptOrRejectBidRequest, updateTrip, handleStartBidding, getAcceptedBidTrips, changeTripStatus };
+
+
+export { createTrip, getTripDetails, getAllTrips, getCustomerAllTrips, createTripPayment, updateTripStatus, getDistance, updateCounterPrice, updateRevisedPrice, getBidPrice, getCounterPrice, acceptOrRejectBidRequest, updateTrip, handleStartBidding, getAcceptedBidTrips, changeTripStatus, paymentVerificationForTrip };

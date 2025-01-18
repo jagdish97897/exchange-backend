@@ -108,6 +108,65 @@ const paymentVerification = asyncHandler(async (req, res) => {
   }
 });
 
+const paymentVerificationforWithdraw = asyncHandler(async (req, res) => {
+  const { userId, amount, razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+
+  if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+    throw new ApiError(400, "Invalid or missing userId.");
+  }
+  if (!amount || isNaN(amount) || Number(amount) <= 0) {
+    throw new ApiError(400, "Invalid amount. Please provide a positive number.");
+  }
+  if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+    throw new ApiError(400, "Missing required payment fields: orderId, paymentId, signature.");
+  }
+
+  try {
+    const body = `${razorpay_order_id}|${razorpay_payment_id}`;
+    const expectedSignature = crypto
+      .createHmac("sha256", process.env.RAZORPAY_API_SECRET)
+      .update(body)
+      .digest("hex");
+
+    if (razorpay_signature !== expectedSignature) {
+      console.error("Invalid payment signature", { razorpay_payment_id, expectedSignature });
+      throw new ApiError(400, "Invalid payment signature.");
+    }
+
+    const wallet = await getOrCreateWallet(userId);
+    console.log("Initial wallet balance:", wallet.balance);
+
+    if (wallet.balance < amount) {
+      throw new ApiError(400, "Insufficient balance for withdrawal.");
+    }
+
+    wallet.transactions.push({
+      amount: Number(amount),
+      type: "debit",
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+    });
+
+    wallet.balance -= Number(amount);
+    console.log("Updated wallet balance:", wallet.balance);
+
+    await wallet.save();
+    console.log("Wallet saved successfully.");
+
+    return res.status(200).json({
+      success: true,
+      message: "Payment verified and wallet updated successfully.",
+      balance: wallet.balance,
+      razorpay_payment_id,
+    });
+  } catch (error) {
+    console.error("Error during payment verification:", error);
+    throw new ApiError(500, "Internal server error during payment verification.");
+  }
+});
+
+
 // Add Amount to Wallet (Optional Endpoint)
 const addAmountToWallet = asyncHandler(async (req, res) => {
   const { userId, amount } = req.body;
@@ -195,8 +254,16 @@ const getBalance = asyncHandler(async (req, res) => {
   }
 });
 
+export { checkout, paymentVerification, addAmountToWallet, getTransactionHistory, getBalance, paymentVerificationforWithdraw };
 
-export { checkout, paymentVerification, addAmountToWallet, getTransactionHistory, getBalance };
+
+
+
+
+
+
+
+
 
 
 
