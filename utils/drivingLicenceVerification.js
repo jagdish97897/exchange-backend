@@ -1,12 +1,9 @@
 import axios from "axios";
 import { ulipToken } from "./ulipApiAccess.js";
-import { ApiError } from "./ApiError.js";
+import { ApiError } from "../src/utils/ApiError.js";
 
 async function drivingLicenceVerification(dlnumber, dob) {
-
     try {
-        // const { dlnumber, dob } = req.body;
-
         if (
             [dlnumber, dob].some((field) => field?.trim() === "")
         ) {
@@ -31,11 +28,14 @@ async function drivingLicenceVerification(dlnumber, dob) {
         }
 
         return response;
-    }
-    catch (error) {
-        console.log('Error', error);
-        // res.status(400).json(error.message);
-        throw new ApiError(400, error.message);
+    } catch (error) {
+        if (error.response) {
+            console.log('Error', error.response.data);
+            throw new ApiError(400, ('Invalid Data format OR DL number'));
+        } else {
+            console.log('Error', error.message);
+            throw new ApiError(400, 'Invalid DL number');
+        }
     }
 };
 

@@ -65,7 +65,7 @@ const vehicleSchema = new Schema(
       type: { type: String, default: "Point" },
       coordinates: {
         type: [Number], // [longitude, latitude]
-        required: true,
+        // required: true,
       },
     },
     biddingAuthorization: {

@@ -3,6 +3,9 @@ import { Vehicle } from "../models/vehicle.model.js";
 import { User } from "../models/user.model.js";
 import { uploadToS3 } from "./user.controller.js";
 import mongoose from "mongoose";
+import { drivingLicenceVerification } from "../../utils/drivingLicenceVerification.js";
+import { verifyAadharAndPAN } from "./user.controller.js";
+import { validateFields } from "./user.controller.js";
 
 
 // Function to upload all files to S3
@@ -183,22 +186,29 @@ export const addVehicle = async (req, res) => {
     // Create vehicle
     const vehicleData = {
       vehicleNumber,
-      rcCopy: uploadedFiles["rcCopy"].map((r) => r),
+      rcCopy: uploadedFiles["rcCopy"]?.length ? uploadedFiles["rcCopy"].map((r) => r) : [],
       height: vehicleHeight,
       width: vehicleWidth,
       length: vehicleLength,
       owner,
-      tdsDeclaration: uploadedFiles["tdsDeclaration"].map((r) => r),
-      ownerConsent: uploadedFiles["ownerConsent"].map((r) => r),
+      tdsDeclaration: uploadedFiles["tdsDeclaration"]?.length ? uploadedFiles["tdsDeclaration"].map((r) => r) : [],
+      ownerConsent: uploadedFiles["ownerConsent"]?.length ? uploadedFiles["ownerConsent"].map((r) => r) : [],
       location: {
         type: 'Point',
-        coordinates: [parsedCurrentLocation.latitude, parsedCurrentLocation.longitude]
+        coordinates: [
+          parsedCurrentLocation?.latitude?.length > 0 ? parsedCurrentLocation?.latitude : '77.1518441',
+          parsedCurrentLocation?.longitude?.length > 0 ? parsedCurrentLocation?.longitude : '28.6909391']
       },
     };
 
     const vehicle = await Vehicle.create([{ ...vehicleData }], { session });
 
     const parsedDriverDob = driverDob ? JSON.parse(driverDob) : null;
+
+    const dateObj = new Date(parsedDriverDob);
+
+    // Format the date
+    const formattedDob = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
 
     // Create driver
     const driverData = {
@@ -208,12 +218,18 @@ export const addVehicle = async (req, res) => {
       aadharNumber: driverAadharNumber,
       panNumber: driverPanNumber,
       dlNumber: driverDlNumber,
-      dob: new Date(parsedDriverDob),
+      dob: dateObj,
       gender: driverGender,
       profileImage: uploadedFiles["driverProfileImage"]?.[0] || "",
       type: "driver",
       vehicle: vehicle[0]._id, // Associate with the created vehicle
     };
+
+    validateFields([driverFullName, driverPhoneNumber, driverAadharNumber, driverPanNumber, driverDlNumber, formattedDob, driverGender]);
+
+    //verify Aadhar, Pan, Dl
+    await verifyAadharAndPAN(driverAadharNumber, driverPanNumber, driverFullName, formattedDob, driverGender, driverPhoneNumber);
+    await drivingLicenceVerification(driverDlNumber, formattedDob);
 
     const driver = await User.create([{ ...driverData }], { session });
 

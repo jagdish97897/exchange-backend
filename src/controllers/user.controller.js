@@ -6,9 +6,9 @@ import axios from "axios";
 import otpGenerator from 'otp-generator';
 import { subject } from '../constants.js';
 import { sendEmail } from '../utils/sendEmail.js';
-import { aadharVerification, panVerification } from "../utils/digilocker.js";
-import { gstVerification } from "../utils/gstinVerification.js";
-import { drivingLicenceVerification } from "../utils/drivingLicenceVerification.js";
+import { aadharVerification, panVerification } from "../../utils/digilocker.js";
+import { gstVerification } from "../../utils/gstinVerification.js";
+import { drivingLicenceVerification } from "../../utils/drivingLicenceVerification.js";
 // import { s3 } from '../utils/sesConfig.js';
 import jwt from 'jsonwebtoken';
 import AWS from 'aws-sdk';
@@ -17,17 +17,153 @@ import { Vehicle } from "../models/vehicle.model.js";
 
 import { sendEmailNotification } from "../../utils/notification.js";
 
+const kyc = asyncHandler(async (req, res) => {
+
+    Object.keys(req.body).forEach(key => {
+        if (req.body[key]) {
+            req.body[key] = req.body[key].trim();
+        }
+    });
+
+    const { fullName, phoneNumber, pin, confirmPin, aadhar, pan, address, dlno, dob, gender, email } = req.body;
+
+    if ([fullName, phoneNumber, pin, confirmPin, aadhar, pan, dlno, dob, gender, email].some(field => !field)) {
+        throw new ApiError(400, "All fields are required");
+    }
+
+    const existingUser = await Visitor.findOne({
+        $or: [
+            { phoneNumber },
+            { aadhar },
+            { pan },
+            { dlno },
+            { email }
+        ]
+    });
+
+    if (existingUser) {
+        let message = "User already exists";
+
+        if (existingUser.phoneNumber === phoneNumber) {
+            message = "Phone number already exists";
+        } else if (existingUser.aadhar === aadhar) {
+            message = "Aadhar number already exists";
+        } else if (existingUser.pan === pan) {
+            message = "PAN number already exists";
+        } else if (existingUser.dlno === dlno) {
+            message = "Driving license number already exists";
+        } else if (existingUser.email === email) {
+            message = "Email already exists";
+        }
+
+        return res.status(400).json({ status: "failed", msg: message });
+    }
+
+    if (pin !== confirmPin) {
+        return res.status(400).json({ status: "failed", msg: "Pin and confirm pin mismatch" });
+    }
+
+    let referrer = '';
+
+    try {
+
+        const options1 = {
+            method: 'POST',
+            url: 'https://pureprakruti.com/api/kyc/verify/aadhar',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            data: { uid: aadhar, name: fullName, dob, gender, mobile: phoneNumber }
+        }
+
+        const aadharResponse = await axios.request(options1);
+
+        if (!aadharResponse) {
+            throw new ApiError('Aadhar verification failed');
+        }
+
+        if (aadharResponse && aadharResponse.data.response.code && aadharResponse.data.response.code_verifier) {
+
+            const options2 = {
+                method: 'POST',
+                url: 'https://pureprakruti.com/api/kyc/verify/pan',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                data: { panno: pan, PANFullName: fullName, code: aadharResponse.data.response.code, code_verifier: aadharResponse.data.response.code_verifier }
+            }
+
+            const panVerificationResponse = await axios.request(options2);
+
+            if (!panVerificationResponse) {
+                throw new ApiError('PAN verification failed');
+            }
+        }
+
+
+        // Hash the pin
+        const hashPin = await bcrypt.hash(pin.toString(), 10);
+
+        const myReferralCode = generateReferralCode({ fullName, phoneNumber });
+
+        // Create a new user with the additional fields
+        const newUser = await Visitor.create({
+            fullName,
+            phoneNumber,
+            pin: hashPin,
+            aadhar,
+            pan,
+            address,
+            dlno,
+            dob,
+            gender,
+            email,
+            referralCode,
+            myReferralCode
+        });
+
+        if (referralCode) {
+            referrer = await Visitor.findOne({ myReferralCode: referralCode });
+
+            if (!referrer) {
+                throw new ApiError(400, 'Referral code does not exists');
+            }
+
+            await Referral.create({ referralCode, referrer, referredUser: newUser });
+
+        }
+
+        // Prepare the response data
+        const data = {
+            userId: newUser._id,
+            fullName: newUser.fullName,
+            phoneNumber: newUser.phoneNumber,
+            aadhar: newUser.aadhar,
+            pan: newUser.pan,
+            address: newUser.address,
+            dlno: newUser.dlno,
+            dob: newUser.dob,
+            gender: newUser.gender,
+            email: newUser.email,
+            referralCode: newUser.referralCode,
+        };
+
+        return res.json(new ApiResponse(201, data, "User registered Successfully"));
+    } catch (error) {
+        throw new ApiError(400, error.message);
+    }
+});
+
 export function validateFields(fields) {
     // console.log(fields)
-    if (fields.some((field) => field.trim() === "")) {
+    if (fields.some((field) => field === "")) {
         throw new ApiError(400, "All fields are required and must be valid strings");
     }
 }
 
-async function verifyAadharAndPAN(aadharNumber, panNumber, fullName, dob, gender, phoneNumber) {
+export async function verifyAadharAndPAN(aadharNumber, panNumber, fullName, dob, gender, phoneNumber) {
     try {
         const aadharResponse = await aadharVerification(aadharNumber, fullName, dob, gender, phoneNumber);
-
 
         if (aadharResponse.error_description) {
             throw new ApiError(400, 'The data on Aadhaar does not match.');
@@ -115,6 +251,17 @@ const register = asyncHandler(async (req, res) => {
                 dlNumber,
             } = req.body;
 
+            const parsedDob = JSON.parse(dob); // Example parsedDob
+
+            // Create a Date object
+            const dateObj = new Date(parsedDob);
+
+            // Format the date
+            const formattedDob = `${String(dateObj.getDate()).padStart(2, '0')}${String(dateObj.getMonth() + 1).padStart(2, '0')}${dateObj.getFullYear()}`;
+
+            // console.log(formattedDate); 
+
+
             // Validate phone number
             if (!phoneNumber || isNaN(Number(phoneNumber))) {
                 throw new ApiError(400, 'Please enter a correct phone number.');
@@ -176,23 +323,32 @@ const register = asyncHandler(async (req, res) => {
             switch (type) {
                 case 'consumer':
                     validateFields([fullName, phoneNumber, email, gstin, companyName, website]);
+                    //verify GST
+                    await gstVerification(gstin);
                     Object.assign(userData, { gstin, companyName, website });
                     break;
 
                 case 'transporter':
-                    validateFields([fullName, phoneNumber, aadharNumber, panNumber, dob, gender]);
-                    Object.assign(userData, { aadharNumber, panNumber, dob, gender });
+                    validateFields([fullName, phoneNumber, aadharNumber, panNumber, formattedDob, gender]);
+                    //verify Aadhar, Pan
+                    await verifyAadharAndPAN(aadharNumber, panNumber, fullName, formattedDob, gender, phoneNumber);
+                    Object.assign(userData, { aadharNumber, panNumber, dob: formattedDob, gender });
                     break;
 
                 case 'owner':
                 case 'broker':
-                    validateFields([fullName, phoneNumber, aadharNumber, panNumber]);
-                    Object.assign(userData, { aadharNumber, panNumber });
+                    validateFields([fullName, phoneNumber, aadharNumber, panNumber, formattedDob, gender]);
+                    //verify Aadhar, Pan
+                    await verifyAadharAndPAN(aadharNumber, panNumber, fullName, formattedDob, gender, phoneNumber);
+                    Object.assign(userData, { aadharNumber, panNumber, dob: formattedDob, gender });
                     break;
 
                 case 'driver':
-                    validateFields([fullName, phoneNumber, aadharNumber, panNumber, dlNumber, dob, gender]);
-                    Object.assign(userData, { aadharNumber, panNumber, dlNumber, dob, gender });
+                    validateFields([fullName, phoneNumber, aadharNumber, panNumber, dlNumber, formattedDob, gender]);
+                    //verify Aadhar, Pan, Dl
+                    // await verifyAadharAndPAN(aadharNumber, panNumber, fullName, formattedDob, gender, phoneNumber);
+                    await drivingLicenceVerification(dlNumber, formattedDob);
+                    Object.assign(userData, { aadharNumber, panNumber, dlNumber, dob: formattedDob, gender });
                     break;
 
                 default:
@@ -224,6 +380,8 @@ const sendOtpOnPhone = asyncHandler(async (req, res) => {
         //         variables_values: otp,
         //         route: 'otp',
         //         numbers: phoneNumber
+        //         schedule_time = ""
+        //         flash = "0"
         //     }
         // });
 

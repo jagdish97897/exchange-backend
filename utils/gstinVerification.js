@@ -1,9 +1,9 @@
 import axios from "axios";
 import { ulipToken } from "./ulipApiAccess.js";
-import { ApiError } from "./ApiError.js";
+import { ApiError } from "../src/utils/ApiError.js";
 
 async function gstVerification(gstin) {
-
+    // console.log('first',ulipToken)
     try {
         if (!gstin.length) {
             throw new ApiError(400, "Please enter GST number");
@@ -25,14 +25,20 @@ async function gstVerification(gstin) {
         if (apiResponse.data.error === 'true') {
             throw new ApiError(400, ('GST Verification Failed'));
         }
+        // console.log('GST Response', response);
 
+        // response.legalNameOfBusiness = companyname;
         // return res.status(200).json(response);
         return response;
     }
     catch (error) {
-        console.log('Error', error);
-        // res.status(400).json(error.message);
-        throw new ApiError(400, error.message);
+        if (error.response) {
+            console.log('Error', error.response.data);
+            throw new ApiError(400, ('Invalid Data format OR GST number'));
+        } else {
+            console.log('Error', error.message);
+            throw new ApiError(400, 'Invalid GST number');
+        }
     }
 };
 

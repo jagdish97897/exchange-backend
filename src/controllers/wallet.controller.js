@@ -4,6 +4,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import Wallet from "../models/wallet.model.js";
 import mongoose from 'mongoose';
+import { User } from "../models/user.model.js";
 
 // Razorpay instance configuration
 const instance = new Razorpay({
@@ -20,6 +21,72 @@ const getOrCreateWallet = async (userId) => {
   return wallet;
 };
 
+const getWallet = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+
+  // Validate userId
+  if (!userId) {
+    throw new ApiError(400, "Invalid userId.");
+  }
+
+  const user = await User.findById(userId);
+
+  if (!user) {
+    throw new ApiError(400, "User not exists.");
+  }
+
+  try {
+    const wallet = await getOrCreateWallet(userId);
+
+    return res.status(200).json({
+      success: true,
+      message: "Wallet retrieved successfully.",
+      wallet,
+    });
+  } catch (error) {
+    console.log("Error fetching/creating wallet:", error.message);
+    throw new ApiError(400, "Error while fetching/creating wallet.");
+  }
+})
+
+const createWallet = asyncHandler(async (req, res) => {
+  const { userId } = req.body;
+
+  // Validate userId
+  if (!userId) {
+    throw new ApiError(400, "Invalid userId.");
+  }
+
+  const user = await User.findById(userId);
+
+  if (!user) {
+    throw new ApiError(400, "User not exists.");
+  }
+
+  try {
+    const existingWallet = await Wallet.findOne({ userId });
+
+    if (existingWallet) {
+      return res.status(400).json({
+        success: false,
+        message: "Wallet already exists for this user.",
+      });
+    }
+
+    const wallet = new Wallet({ userId, balance: 0 });
+    await wallet.save();
+
+    return res.status(201).json({
+      success: true,
+      message: "Wallet created successfully.",
+      wallet,
+    });
+  } catch (error) {
+    console.error("Error creating wallet:", error.message);
+    throw new ApiError(500, "Error while creating wallet.");
+  }
+});
+
 // Checkout Endpoint
 const checkout = asyncHandler(async (req, res) => {
   const { amount } = req.body;
@@ -32,7 +99,7 @@ const checkout = asyncHandler(async (req, res) => {
   try {
     // Create Razorpay order
     const options = {
-      amount: Number(amount) * 100, 
+      amount: Number(amount) * 100,
       currency: "INR",
     };
 
@@ -254,7 +321,7 @@ const getBalance = asyncHandler(async (req, res) => {
   }
 });
 
-export { checkout, paymentVerification, addAmountToWallet, getTransactionHistory, getBalance, paymentVerificationforWithdraw };
+export { getWallet, createWallet, checkout, paymentVerification, addAmountToWallet, getTransactionHistory, getBalance, paymentVerificationforWithdraw };
 
 
 
@@ -263,7 +330,7 @@ export { checkout, paymentVerification, addAmountToWallet, getTransactionHistory
 
 
 
-
+// export {  checkout, paymentVerification, addAmountToWallet, getTransactionHistory, getBalance };
 
 
 
@@ -291,7 +358,7 @@ export { checkout, paymentVerification, addAmountToWallet, getTransactionHistory
 //   try {
 //     // Create Razorpay order
 //     const options = {
-//       amount: Number(amount) * 100, 
+//       amount: Number(amount) * 100,
 //       currency: "INR",
 //     };
 

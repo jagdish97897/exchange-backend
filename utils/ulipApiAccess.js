@@ -17,17 +17,19 @@ async function fetchNewULIPToken() {
         }
     });
 
+    // console.log('token :', response?.data?.response?.id)
+
     // Implement the logic to fetch the new ULIP token from the required source
     return response?.data?.response?.id; // Replace this with the actual new token
 }
-
+// 
 // Schedule a cron job to update the ULIP token every hour
-// cron.schedule('* * * * *', async () => {
-//     try {
-//         ulipToken = await fetchNewULIPToken();
-//     } catch (error) {
-//         console.error('Error updating ULIP token:', error);
-//     }
-// });
+cron.schedule('* * * * *', async () => {
+    try {
+        ulipToken = await fetchNewULIPToken();
+    } catch (error) {
+        console.log('Error updating ULIP token:', error);
+    }
+});
 
 export { ulipToken };
