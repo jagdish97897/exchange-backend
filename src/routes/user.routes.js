@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { register, sendOtpOnPhone, sendOtpOnEmail, uploadImages, sendLoginOtp, getUserByPhoneNumber, addBroker, getUserById, updateUserByPhoneNumber, verifyLoginOtp, updateUserLocation, updateUserLocation1, updateStatus } from "../controllers/user.controller.js";
+import { register, sendOtpOnPhone, sendOtpOnEmail, uploadImages, sendLoginOtp, getUserByPhoneNumber, addBroker, getUserById, updateUserByPhoneNumber, verifyLoginOtp, updateUserLocation, updateUserLocation1, updateStatus, savePushToken } from "../controllers/user.controller.js";
 import { upload } from "../middlewares/multer.middleware.js";
 // import { verifyJWT } from "../middlewares/auth.middleware.js";
 import { gstVerification } from "../../utils/gstinVerification.js";
@@ -26,4 +26,6 @@ router.route("/location").put(updateUserLocation);
 router.route("/addBroker").post(addBroker);
 router.put('/update-location/:userId', updateUserLocation1);
 router.put("/update-status/:userId", updateStatus);
+router.patch("/save-push-token", savePushToken);
+
 export default router;

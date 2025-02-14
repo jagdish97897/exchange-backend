@@ -769,6 +769,24 @@ const uploadImages = async (req, res) => {
 };
 
 
+const savePushToken = async (req, res) => {
+    try {
+        const { userId, expoPushToken } = req.body;
+
+        if (!userId || !expoPushToken) {
+            throw new Error('All fields are required');
+        }
+
+        const user = await User.findByIdAndUpdate(userId, { pushNotificationToken: expoPushToken });
+        // console.log('User', user);
+
+        return res.status(200).json({ success: true, message: "Expopushtoken updated successfully" })
+    } catch (error) {
+        console.log('Error', error.message);
+        throw new Error('Failed to update expoPushToken');
+    }
+}
+
 export {
-    register, sendOtpOnPhone, sendOtpOnEmail, uploadToS3, sendLoginOtp, getUserByPhoneNumber, updateUserByPhoneNumber, generateToken, verifyLoginOtp, updateUserLocation, getUserById, updateUserLocation1, updateStatus, addBroker, uploadImages
+    register, sendOtpOnPhone, sendOtpOnEmail, uploadToS3, sendLoginOtp, getUserByPhoneNumber, updateUserByPhoneNumber, generateToken, verifyLoginOtp, updateUserLocation, getUserById, updateUserLocation1, updateStatus, addBroker, uploadImages, savePushToken
 }

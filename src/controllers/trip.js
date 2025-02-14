@@ -499,7 +499,7 @@ const updateRevisedPrice = asyncHandler(async (req, res) => {
     if (!trip) {
         throw new ApiError(404, "Trip not found");
     }
-    console.log(trip)
+    // console.log(trip)
     if (!trip.bids.length) {
         const counterPriceObj = trip.counterPriceList.find(list => list.user.toString() === vspUserId);
         trip.bids.push({ price: counterPriceObj.counterPrice, user: vspUser, role: vspUser.type, timestamp: new Date() });
@@ -639,7 +639,7 @@ const changeTripStatus = async () => {
 cron.schedule('* * * * *', async (params) => {
     try {
         const response = await changeTripStatus();
-        console.log(response);
+        // console.log(response);
     } catch (error) {
         console.error('Error updating ULIP token:', error);
     }

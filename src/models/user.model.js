@@ -1,4 +1,5 @@
 import mongoose, { Schema } from "mongoose";
+import { type } from "os";
 
 const userSchema = new Schema(
     {
@@ -130,7 +131,8 @@ const userSchema = new Schema(
                 },
             },
         },
-        bidAccepted: { type: Boolean, default: false }
+        bidAccepted: { type: Boolean, default: false },
+        pushNotificationToken: { type: String },
     },
     {
         timestamps: true,
