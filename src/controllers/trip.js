@@ -14,83 +14,85 @@ import Wallet from "../models/wallet.model.js";
 import { Trip } from "../models/trip.js"; // Assuming Trip is imported from its model
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
+import { S2 } from "s2-geometry";
+import { Location } from "../models/location.model.js";
 
 
 
 const paymentVerificationForTrip = asyncHandler(async (req, res) => {
     const { userId, tripId, amount, razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
-  
+
     // Validate required fields
     if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
-      throw new ApiError(400, "Invalid or missing userId.");
+        throw new ApiError(400, "Invalid or missing userId.");
     }
     if (!amount || isNaN(amount) || Number(amount) <= 0) {
-      throw new ApiError(400, "Invalid amount. Please provide a positive number.");
+        throw new ApiError(400, "Invalid amount. Please provide a positive number.");
     }
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-      throw new ApiError(400, "Missing required payment fields: orderId, paymentId, signature.");
+        throw new ApiError(400, "Missing required payment fields: orderId, paymentId, signature.");
     }
-  
+
     try {
-      // Generate and compare signatures
-      const body = `${razorpay_order_id}|${razorpay_payment_id}`;
-      const expectedSignature = crypto
-        .createHmac("sha256", process.env.RAZORPAY_API_SECRET)
-        .update(body)
-        .digest("hex");
-  
-      if (razorpay_signature !== expectedSignature) {
-        console.error("Invalid payment signature", { razorpay_payment_id, expectedSignature });
-        throw new ApiError(400, "Invalid payment signature.");
-      }
-  
-      // Find the Trip document
-      console.log(`Searching for trip with ID: ${tripId}`);
-      const trip = await Trip.findById(tripId);
-  
-      if (!trip) {
-        console.error(`Trip not found for tripId: ${tripId}`);
-        throw new ApiError(404, "Trip not found.");
-      }
-  
-      // Check if finalPrice exists
-      if (!trip.finalPrice || trip.finalPrice <= 0) {
-        throw new ApiError(400, "Final price is not set for this trip.");
-      }
-  
-      // Add transaction without modifying the finalPrice
-      trip.transactions.push({
-        amount: Number(amount),
-        type: "credit",
-        razorpay_order_id,
-        razorpay_payment_id,
-        razorpay_signature,
-      });
+        // Generate and compare signatures
+        const body = `${razorpay_order_id}|${razorpay_payment_id}`;
+        const expectedSignature = crypto
+            .createHmac("sha256", process.env.RAZORPAY_API_SECRET)
+            .update(body)
+            .digest("hex");
+
+        if (razorpay_signature !== expectedSignature) {
+            console.error("Invalid payment signature", { razorpay_payment_id, expectedSignature });
+            throw new ApiError(400, "Invalid payment signature.");
+        }
+
+        // Find the Trip document
+        console.log(`Searching for trip with ID: ${tripId}`);
+        const trip = await Trip.findById(tripId);
+
+        if (!trip) {
+            console.error(`Trip not found for tripId: ${tripId}`);
+            throw new ApiError(404, "Trip not found.");
+        }
+
+        // Check if finalPrice exists
+        if (!trip.finalPrice || trip.finalPrice <= 0) {
+            throw new ApiError(400, "Final price is not set for this trip.");
+        }
+
+        // Add transaction without modifying the finalPrice
+        trip.transactions.push({
+            amount: Number(amount),
+            type: "credit",
+            razorpay_order_id,
+            razorpay_payment_id,
+            razorpay_signature,
+        });
 
         trip.status = "inProgress";
-  
-      // Save the updated Trip document
-      await trip.save();
-  
-      return res.status(200).json({
-        success: true,
-        message: "Payment verified and trip transaction updated successfully.",
-        transactions: trip.transactions,
-        remainingFinalPrice: trip.finalPrice,  
-      });
+
+        // Save the updated Trip document
+        await trip.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "Payment verified and trip transaction updated successfully.",
+            transactions: trip.transactions,
+            remainingFinalPrice: trip.finalPrice,
+        });
     } catch (error) {
-      console.error("Error during payment verification:", error);
-      throw new ApiError(
-        error.statusCode || 500,
-        error.message || "Internal server error during payment verification."
-      );
+        console.error("Error during payment verification:", error);
+        throw new ApiError(
+            error.statusCode || 500,
+            error.message || "Internal server error during payment verification."
+        );
     }
-  });
-  
-  
+});
+
+
 // const paymentVerificationForTrip = asyncHandler(async (req, res) => {
 //     const { userId, tripId, amount, razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
-  
+
 //     // Validate required fields
 //     if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
 //       throw new ApiError(400, "Invalid or missing userId.");
@@ -101,7 +103,7 @@ const paymentVerificationForTrip = asyncHandler(async (req, res) => {
 //     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
 //       throw new ApiError(400, "Missing required payment fields: orderId, paymentId, signature.");
 //     }
-  
+
 //     try {
 //       // Generate and compare signatures
 //       const body = `${razorpay_order_id}|${razorpay_payment_id}`;
@@ -109,35 +111,35 @@ const paymentVerificationForTrip = asyncHandler(async (req, res) => {
 //         .createHmac("sha256", process.env.RAZORPAY_API_SECRET)
 //         .update(body)
 //         .digest("hex");
-  
+
 //       if (razorpay_signature !== expectedSignature) {
 //         console.error("Invalid payment signature", { razorpay_payment_id, expectedSignature });
 //         throw new ApiError(400, "Invalid payment signature.");
 //       }
-  
+
 //       // Find the Trip document
 //       console.log(`Searching for trip with ID: ${tripId}`);
 //       const trip = await Trip.findById(tripId);
-  
+
 //       if (!trip) {
 //         console.error(`Trip not found for tripId: ${tripId}`);
 //         throw new ApiError(404, "Trip not found.");
 //       }
-  
+
 //       // Check if finalPrice exists
 //       if (!trip.finalPrice || trip.finalPrice <= 0) {
 //         throw new ApiError(400, "Final price is not set for this trip.");
 //       }
-  
+
 //       // Deduct the amount from finalPrice
 //       trip.finalPrice -= Number(amount);
-  
+
 //       // Prevent negative finalPrice
 //       if (trip.finalPrice < 0) {
 //         console.error("Payment amount exceeds final price.");
 //         throw new ApiError(400, "Payment amount exceeds the remaining final price.");
 //       }
-  
+
 //       // Add transaction
 //       trip.transactions.push({
 //         amount: Number(amount),
@@ -146,10 +148,10 @@ const paymentVerificationForTrip = asyncHandler(async (req, res) => {
 //         razorpay_payment_id,
 //         razorpay_signature,
 //       });
-  
+
 //       // Save the updated Trip document
 //       await trip.save();
-  
+
 //       return res.status(200).json({
 //         success: true,
 //         message: "Payment verified, trip transaction updated, and final price adjusted successfully.",
@@ -164,7 +166,7 @@ const paymentVerificationForTrip = asyncHandler(async (req, res) => {
 //       );
 //     }
 //   });
-  
+
 
 
 
@@ -230,7 +232,7 @@ const createTrip = asyncHandler(async (req, res) => {
 const updateTrip = asyncHandler(async (req, res) => {
     try {
         const { tripId } = req.params; // Extract trip ID from route params
-        const { from, to, tripDate, cargoDetails, specialInstruction, currentLocation } = req.body; 
+        const { from, to, tripDate, cargoDetails, specialInstruction, currentLocation } = req.body;
         console.log('cargo ', cargoDetails);
         // Validate that at least one field to update is provided
         if (!from && !to && !tripDate && !cargoDetails && !specialInstruction && !currentLocation) {
@@ -275,6 +277,81 @@ const updateTrip = asyncHandler(async (req, res) => {
 });
 
 
+// const handleStartBidding = asyncHandler(async (req, res) => {
+//     const { tripId } = req.params;
+//     const trip = await Trip.findById(tripId);
+
+//     if (!trip) {
+//         throw new ApiError(400, 'Trip not found!');
+//     }
+
+//     trip.biddingStatus = 'inProgress';
+//     trip.biddingStartTime = new Date();
+
+//     await trip.save();
+
+//     const data = await getCoordinatesFromPincode(trip.from);
+
+//     if (data.latitude && data.longitude) {
+
+
+//         const nearbyVehicles = await Vehicle.find({
+//             location: {
+//                 $near: {
+//                     $geometry: {
+//                         type: "Point",
+//                         coordinates: [data.latitude, data.longitude], //  Latitude, Longitude
+//                     },
+//                     $maxDistance: 10000000, // 10 kilometers
+//                 },
+//             },
+//         })
+//             .populate("driver", "fullName phoneNumber") // Populate specific fields from the User model
+//             .populate("owner", "fullName email"); // Populate specific fields from the User model
+
+//         // console.log('nearbyVehicles : ', nearbyVehicles);
+
+//         const userIds = nearbyVehicles.reduce((acc, value) => {
+//             if (value.owner && value.owner._id) {
+//                 acc.push(value.owner._id); // Add owner ID to the accumulator
+//             }
+
+//             if (value.driver && value.driver._id) {
+//                 acc.push(value.driver._id); // Add driver ID to the accumulator
+//             }
+
+//             return acc; // Return the updated accumulator
+//         }, []); // Initialize accumulator as an empty array
+
+//         // console.log(userIds);
+
+//         const promises = userIds.map(userId => emitNewMessage("newTrip", userId, trip));
+
+//         await Promise.all(promises);
+
+//         return res.status(200).json({ success: true, message: 'Bidding started successfully' });
+//     }
+
+//     return res.status(400).json({ success: false, message: 'Bidding not started', trip });
+
+// })
+
+// Function to get surrounding cells within a given radius
+const getNearbyCellIds = (lat, lng, level, expandFactor) => {
+    const cellId = S2.latLngToKey(lat, lng, level);
+    const cell = S2.keyToCellId(cellId);
+
+    let allCells = [cellId]; // Start with the current cell
+
+    // Get neighbors to expand search area
+    for (let i = 0; i < expandFactor; i++) {
+        const neighbors = allCells.flatMap((c) => S2.getNeighbors(S2.keyToCellId(c)));
+        allCells = [...new Set([...allCells, ...neighbors.map(S2.cellIdToKey)])]; // Remove duplicates
+    }
+
+    return allCells;
+};
+
 const handleStartBidding = asyncHandler(async (req, res) => {
     const { tripId } = req.params;
     const trip = await Trip.findById(tripId);
@@ -293,37 +370,58 @@ const handleStartBidding = asyncHandler(async (req, res) => {
     if (data.latitude && data.longitude) {
 
 
-        const nearbyVehicles = await Vehicle.find({
-            location: {
-                $near: {
-                    $geometry: {
-                        type: "Point",
-                        coordinates: [data.latitude, data.longitude], //  Latitude, Longitude
-                    },
-                    $maxDistance: 10000000, // 10 kilometers
-                },
-            },
-        })
-            .populate("driver", "fullName phoneNumber") // Populate specific fields from the User model
-            .populate("owner", "fullName email"); // Populate specific fields from the User model
+        // const nearbyVehicles = await Vehicle.find({
+        //     location: {
+        //         $near: {
+        //             $geometry: {
+        //                 type: "Point",
+        //                 coordinates: [data.latitude, data.longitude], //  Latitude, Longitude
+        //             },
+        //             $maxDistance: 10000000, // 10 kilometers
+        //         },
+        //     },
+        // })
+        //     .populate("driver", "fullName phoneNumber") // Populate specific fields from the User model
+        //     .populate("owner", "fullName email"); // Populate specific fields from the User model
 
-        // console.log('nearbyVehicles : ', nearbyVehicles);
+        // // console.log('nearbyVehicles : ', nearbyVehicles);
 
-        const userIds = nearbyVehicles.reduce((acc, value) => {
-            if (value.owner && value.owner._id) {
-                acc.push(value.owner._id); // Add owner ID to the accumulator
-            }
+        // const userIds = nearbyVehicles.reduce((acc, value) => {
+        //     if (value.owner && value.owner._id) {
+        //         acc.push(value.owner._id); // Add owner ID to the accumulator
+        //     }
 
-            if (value.driver && value.driver._id) {
-                acc.push(value.driver._id); // Add driver ID to the accumulator
-            }
+        //     if (value.driver && value.driver._id) {
+        //         acc.push(value.driver._id); // Add driver ID to the accumulator
+        //     }
 
-            return acc; // Return the updated accumulator
-        }, []); // Initialize accumulator as an empty array
+        //     return acc; // Return the updated accumulator
+        // }, []); // Initialize accumulator as an empty array
 
         // console.log(userIds);
 
-        const promises = userIds.map(userId => emitNewMessage("newTrip", userId, trip));
+        let nearbyDrivers = [];
+        const searchRadii = [5, 10, 20, 40, 50, 100]; // Radius in km
+        const level = 16; // We are storing cellId at level 16
+
+        for (const radius of searchRadii) {
+            const expandFactor = Math.ceil(radius / 1.1); // Convert km to number of S2 cells to check
+            const cellIds = getNearbyCellIds(data.latitude, data.longitude, level, expandFactor); // Get nearby cellIds
+
+            // Query available drivers
+            nearbyDrivers = await Location.find({
+                cellId: { $in: cellIds },
+                available: true,
+            })
+                .limit(15)
+                .lean();
+
+            if (nearbyDrivers.length >= 15) break; // Stop if enough drivers are found
+        }
+
+        // return nearbyDrivers;
+
+        const promises = nearbyDrivers.map(userId => emitNewMessage("newTrip", userId, trip));
 
         await Promise.all(promises);
 
@@ -594,6 +692,7 @@ const acceptOrRejectBidRequest = asyncHandler(async (req, res) => {
     // Save the updated trip
     await trip.save();
     await vspUser.save();
+    await Location.findOneAndUpdate({ userId: vspUserId }, { available: false });
 
     // Respond with success
     return res.status(200).json({

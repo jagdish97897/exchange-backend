@@ -1,5 +1,7 @@
 import 'dotenv/config';
 import axios from 'axios';
+import { S2 } from 's2-geometry';
+
 
 const getLocation = async (req, res) => {
     const { fromPin, toPin } = req.body;
@@ -94,4 +96,57 @@ const getLocation = async (req, res) => {
     }
 };
 
-export { getLocation };
+const getZoneFromGooglePlaces = async (latitude, longitude) => {
+    const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${process.env.GOOGLE_MAPS_API_KEY}`;
+
+    try {
+        const response = await axios.get(url);
+        const { results } = response.data;
+
+        // console.log('Result :', results);
+
+        if (results && results.length > 0) {
+            let state = null;
+            let country = null;
+
+            // Loop through address components to find state and country
+            for (const component of results[0].address_components) {
+                if (component.types.includes("administrative_area_level_1")) {
+                    state = component.long_name; // State (Zone)
+                }
+                if (component.types.includes("country")) {
+                    country = component.short_name; // Country Code (IN for India)
+                }
+            }
+
+            // Ensure the location is in India before returning the zone (state)
+            if (country === "IN" && state) {
+                return state;
+            } else {
+                return "Outside India";
+            }
+        }
+
+        console.warn("No results found for latlng:", latitude, longitude);
+        return "Unknown";
+    } catch (error) {
+        console.error("Error in reverse geocoding:", error);
+        return "Unknown";
+    }
+};
+
+// Helper function to convert lat/lng to S2 Cell ID at a given level
+const getCellId = async (lat, lng, level = 16) => S2.latLngToKey(lat, lng, level);
+
+// // Example driver and passenger locations (lat/lng)
+// const driverLocation = { lat: 37.7749, lng: -122.4194 }; // San Francisco
+// const passengerLocation = { lat: 37.7750, lng: -122.4195 }; // Nearby location
+
+// // Get S2 Cell IDs
+// const driverCellId = await getCellId(driverLocation.lat, driverLocation.lng);
+// const passengerCellId = await getCellId(passengerLocation.lat, passengerLocation.lng);
+
+// console.log("Driver Cell ID &:", driverCellId);
+// console.log("Passenger Cell ID &:", passengerCellId);
+
+export { getLocation, getZoneFromGooglePlaces, getCellId };

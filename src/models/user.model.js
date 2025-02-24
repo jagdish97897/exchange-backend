@@ -131,6 +131,7 @@ const userSchema = new Schema(
                 },
             },
         },
+        cellId: { type: String },
         bidAccepted: { type: Boolean, default: false },
         pushNotificationToken: { type: String },
     },

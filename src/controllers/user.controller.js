@@ -14,6 +14,7 @@ import jwt from 'jsonwebtoken';
 import AWS from 'aws-sdk';
 import multer from 'multer';
 import { Vehicle } from "../models/vehicle.model.js";
+import { getCellId } from "../../utils/location.js";
 
 import { sendEmailNotification } from "../../utils/notification.js";
 
@@ -630,10 +631,12 @@ const updateUserLocation = asyncHandler(async (req, res) => {
         });
     }
 
+    const cellId = await getCellId(latitude, longitude);
+
     // Update the user's location in the database
     const user = await User.findByIdAndUpdate(
         userId,
-        { currentLocation: { latitude, longitude } },
+        { currentLocation: { latitude, longitude }, cellId },
         { new: true } // Return the updated document
     );
 
