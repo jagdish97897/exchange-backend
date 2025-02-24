@@ -15,6 +15,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { S2 } from "s2-geometry";
 import { Location } from "../models/location.model.js";
 import { Transactions } from "../models/transaction.model.js";
+import { TripNotification } from "../models/trip_notification.model.js";
 
 
 
@@ -343,6 +344,8 @@ const updateTrip = asyncHandler(async (req, res) => {
 // })
 
 // Function to get surrounding cells within a given radius
+
+
 const getNearbyCellIds = (lat, lng, level, expandFactor) => {
     const cellId = S2.latLngToKey(lat, lng, level);
     const cell = S2.keyToCellId(cellId);
@@ -427,9 +430,11 @@ const handleStartBidding = asyncHandler(async (req, res) => {
 
         // return nearbyDrivers;
 
-        const promises = nearbyDrivers.map(userId => emitNewMessage("newTrip", userId, trip));
+        await Promise.all([
+            ...nearbyDrivers.map(userId => emitNewMessage("newTrip", userId, trip)),
+            ...nearbyDrivers.map(userId => TripNotification.create({ trip, user: userId }))
+        ]);
 
-        await Promise.all(promises);
 
         return res.status(200).json({ success: true, message: 'Bidding started successfully' });
     }
@@ -502,15 +507,34 @@ const getAllTrips = asyncHandler(async (req, res) => {
         return res.status(200).json({ trips: [], message: 'Thank you ! You have accepted a bid. Continue your journey safely!', bidAccepted: user.bidAccepted });
     }
 
-    const trips = await Trip.find({
-        biddingStatus: { $eq: 'inProgress' },
-        $expr: {
-            $lt: [
-                new Date(), // Current time
-                { $add: ['$biddingStartTime', 1000 * 60 * 30] } // Add 30 minutes to biddingStartTime
-            ]
+    const trips = await TripNotification.aggregate([
+        {
+            $match: { user: new mongoose.Types.ObjectId(userId) }
+        },
+        {
+            $lookup: {
+                from: "trips", // Assuming your Trip collection is named "trips"
+                localField: "trip",
+                foreignField: "_id",
+                as: "trip"
+            }
+        },
+        {
+            $unwind: "$trip"
+        },
+        {
+            $match: {
+                "trip.biddingStatus": "inProgress",
+                $expr: {
+                    $lt: [
+                        new Date(),
+                        { $add: ["$trip.biddingStartTime", 1000 * 60 * 30] } // Add 30 minutes
+                    ]
+                }
+            }
         }
-    });
+    ]);
+
     if (!trips || trips.length === 0) {
         return res.status(400).json({ message: "No trips found" });
     }
