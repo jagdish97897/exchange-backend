@@ -6,8 +6,6 @@ import { Vehicle } from "../models/vehicle.model.js";
 import { server } from '../app.js';
 import { emitNewMessage, configureSocket } from "../webSocket.js";
 import cron from 'node-cron';
-
-
 import crypto from "crypto";
 import mongoose from "mongoose";
 import Wallet from "../models/wallet.model.js";
@@ -16,6 +14,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { S2 } from "s2-geometry";
 import { Location } from "../models/location.model.js";
+import { Transactions } from "../models/transaction.model.js";
 
 
 
@@ -47,12 +46,17 @@ const paymentVerificationForTrip = asyncHandler(async (req, res) => {
         }
 
         // Find the Trip document
-        console.log(`Searching for trip with ID: ${tripId}`);
-        const trip = await Trip.findById(tripId);
+        // console.log(`Searching for trip with ID: ${tripId}`);
+        const [trip, user] = await Promise.all([Trip.findById(tripId), User.findById(userId)]);
 
         if (!trip) {
             console.error(`Trip not found for tripId: ${tripId}`);
             throw new ApiError(404, "Trip not found.");
+        }
+
+        if (!user) {
+            console.error(`User not found for userId: ${userId}`);
+            throw new ApiError(404, "User not found.");
         }
 
         // Check if finalPrice exists
@@ -61,7 +65,9 @@ const paymentVerificationForTrip = asyncHandler(async (req, res) => {
         }
 
         // Add transaction without modifying the finalPrice
-        trip.transactions.push({
+        await Transactions.create({
+            user,
+            trip,
             amount: Number(amount),
             type: "credit",
             razorpay_order_id,

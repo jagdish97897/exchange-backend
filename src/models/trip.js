@@ -98,17 +98,6 @@ const tripSchema = new Schema({
         type: Number,
         required: false, // Set when the bidding process is complete
     },
-    transactions: [
-        {
-          amount: { type: Number, required: false },
-          date: { type: Date, default: Date.now },
-          type: { type: String, enum: ['credit', 'debit'], required: true },
-          razorpay_order_id: { type: String, required: false },
-          razorpay_payment_id: { type: String, required: false },
-          razorpay_signature: { type: String, required: false },
-        },
-      ],
-
 
     // Status of the bidding process
     biddingStatus: {
