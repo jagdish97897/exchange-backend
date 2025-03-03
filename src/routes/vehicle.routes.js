@@ -5,7 +5,8 @@ import {
     updateVehicleByNumber,
     getVehicleByNumber,
     // getAllVehicles,
-    updateVehicleLocation
+    updateVehicleLocation,
+    getVehicleById
 } from "../controllers/vehicle.controller.js";
 import { upload } from "../middlewares/multer.middleware.js";
 
@@ -30,5 +31,6 @@ router.get("/:vehicleNumber", getVehicleByNumber);
 // router.get("/vehicles/:id", getVehicleById);
 router.patch("/location", updateVehicleLocation);
 // router.delete("/vehicles/:id", deleteVehicle);
+router.get("/vehicle/:vehicleId", getVehicleById);
 
 export default router;

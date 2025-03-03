@@ -136,7 +136,7 @@ const getZoneFromGooglePlaces = async (latitude, longitude) => {
 };
 
 // Helper function to convert lat/lng to S2 Cell ID at a given level
-const getCellId = async (lat, lng, level = 16) => S2.latLngToKey(lat, lng, level);
+const getCellId = async (lat, lng, level = 13) => S2.latLngToKey(lat, lng, level);
 
 // // Example driver and passenger locations (lat/lng)
 // const driverLocation = { lat: 37.7749, lng: -122.4194 }; // San Francisco
@@ -149,4 +149,24 @@ const getCellId = async (lat, lng, level = 16) => S2.latLngToKey(lat, lng, level
 // console.log("Driver Cell ID &:", driverCellId);
 // console.log("Passenger Cell ID &:", passengerCellId);
 
-export { getLocation, getZoneFromGooglePlaces, getCellId };
+const getDistance = async (req, res) => {
+    const {lat1,lon1,lat2,lon2} = req.query;
+    const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${lat1},${lon1}&destinations=${lat2},${lon2}&key=${process.env.GOOGLE_MAPS_API_KEY}`;
+
+    try {
+        const response = await axios.get(url);
+        let distance = '';
+        if (response.data.status === 'OK') {
+            distance = response.data.rows[0].elements[0].distance.text;
+            console.log(`Distance: ${distance}`);
+        } else {
+            console.error('Error fetching distance:', response.data.error_message);
+        }
+        return res.status(200).json({ success: true, distance });
+    } catch (error) {
+        console.error('Error:', error.message);
+    }
+};
+
+
+export { getLocation, getZoneFromGooglePlaces, getCellId, getDistance };

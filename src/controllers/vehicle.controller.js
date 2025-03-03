@@ -174,10 +174,14 @@ export const addVehicle = async (req, res) => {
     }
 
     // Validate owner
-    const owner = await User.findById(ownerId).session(session);
+    const [owner, isVehicleExist] = await Promise.all([User.findById(ownerId).session(session), Vehicle.findOne({ vehicleNumber })]);
 
     if (!owner) {
       throw new Error("Owner not found");
+    }
+
+    if (isVehicleExist) {
+      throw new Error("Vehicle already exists");
     }
 
     // Upload files
@@ -228,8 +232,8 @@ export const addVehicle = async (req, res) => {
     validateFields([driverFullName, driverPhoneNumber, driverAadharNumber, driverPanNumber, driverDlNumber, formattedDob, driverGender]);
 
     //verify Aadhar, Pan, Dl
-    await verifyAadharAndPAN(driverAadharNumber, driverPanNumber, driverFullName, formattedDob, driverGender, driverPhoneNumber);
-    await drivingLicenceVerification(driverDlNumber, formattedDob);
+    // await verifyAadharAndPAN(driverAadharNumber, driverPanNumber, driverFullName, formattedDob, driverGender, driverPhoneNumber);
+    // await drivingLicenceVerification(driverDlNumber, formattedDob);
 
     const driver = await User.create([{ ...driverData }], { session });
 
@@ -367,3 +371,28 @@ export const updateVehicleLocation = async (req, res) => {
   }
 
 }
+
+export const getVehicleById = async (req, res) => {
+  try {
+    const { vehicleId } = req.params;
+
+    if (!vehicleId) {
+      return res.status(400).json({ message: "Vehicle ID is required" });
+    }
+
+    const vehicle = await Vehicle.findById(vehicleId)
+      .populate("owner", "fullName email phoneNumber")
+      .populate("broker", "fullName email phoneNumber")
+      .populate("driver", "fullName email phoneNumber aadharNumber panNumber dlNumber dob gender profileImage")
+      .exec();
+
+    if (!vehicle) {
+      return res.status(404).json({ message: "Vehicle not found" });
+    }
+
+    return res.status(200).json(vehicle);
+  } catch (error) {
+    console.error("Error fetching vehicle details:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+};

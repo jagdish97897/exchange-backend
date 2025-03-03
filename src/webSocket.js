@@ -14,7 +14,7 @@ const configureSocket = (server) => {
         },
     });
 
-    trackLocationUpdates(io);
+    // trackLocationUpdates(io);
 
     io.on("connection", async (socket) => {
         const token = socket.handshake.query.token;

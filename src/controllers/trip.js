@@ -346,20 +346,240 @@ const updateTrip = asyncHandler(async (req, res) => {
 // Function to get surrounding cells within a given radius
 
 
-const getNearbyCellIds = (lat, lng, level, expandFactor) => {
-    const cellId = S2.latLngToKey(lat, lng, level);
-    const cell = S2.keyToCellId(cellId);
+// const getNearbyCellIds = (lat, lng, level, expandFactor) => {
+//     let allCells = new Set([S2.latLngToKey(lat, lng, level)]); // Start with the base cell
 
-    let allCells = [cellId]; // Start with the current cell
+//     for (let i = 0; i < expandFactor; i++) {
+//         let newCells = new Set();
 
-    // Get neighbors to expand search area
+//         for (let cellKey of allCells) {
+//             console.log('cellKey is', S2.keyToLatLng(cellKey))
+//             const neighbors = S2.latLngToNeighborKeys(
+//                 S2.keyToLatLng(cellKey).lat,
+//                 S2.keyToLatLng(cellKey).lng,
+//                 level
+//             ); // Get neighbors based on each cell's lat/lng
+
+//             newCells = new Set([...newCells, ...neighbors]);
+//         }
+
+//         allCells = new Set([...allCells, ...newCells]); // Merge sets to remove duplicates
+//     }
+
+//     return Array.from(allCells); // Convert Set to array
+// };
+
+// const handleStartBidding = asyncHandler(async (req, res) => {
+//     const { tripId } = req.params;
+//     const trip = await Trip.findById(tripId);
+
+//     if (!trip) {
+//         throw new ApiError(400, 'Trip not found!');
+//     }
+
+//     trip.biddingStatus = 'inProgress';
+//     trip.biddingStartTime = new Date();
+
+//     await trip.save();
+
+//     const data = await getCoordinatesFromPincode(trip.from);
+
+//     if (data.latitude && data.longitude) {
+
+
+//         // const nearbyVehicles = await Vehicle.find({
+//         //     location: {
+//         //         $near: {
+//         //             $geometry: {
+//         //                 type: "Point",
+//         //                 coordinates: [data.latitude, data.longitude], //  Latitude, Longitude
+//         //             },
+//         //             $maxDistance: 10000000, // 10 kilometers
+//         //         },
+//         //     },
+//         // })
+//         //     .populate("driver", "fullName phoneNumber") // Populate specific fields from the User model
+//         //     .populate("owner", "fullName email"); // Populate specific fields from the User model
+
+//         // // console.log('nearbyVehicles : ', nearbyVehicles);
+
+//         // const userIds = nearbyVehicles.reduce((acc, value) => {
+//         //     if (value.owner && value.owner._id) {
+//         //         acc.push(value.owner._id); // Add owner ID to the accumulator
+//         //     }
+
+//         //     if (value.driver && value.driver._id) {
+//         //         acc.push(value.driver._id); // Add driver ID to the accumulator
+//         //     }
+
+//         //     return acc; // Return the updated accumulator
+//         // }, []); // Initialize accumulator as an empty array
+
+//         // console.log(userIds);
+
+//         const BATCH_SIZE = 500; // Process 500 at a time
+//         let nearbyDrivers = [];
+//         const searchRadii = [5, 10, 20, 40, 50, 100]; // Radius in km
+//         const level = 13; // We are storing cellId at level 16
+
+//         for (const radius of searchRadii) {
+//             const expandFactor = Math.ceil(radius / 1.1); // Convert km to number of S2 cells to check
+//             const cellIds = getNearbyCellIds(data.latitude, data.longitude, level, expandFactor); // Get nearby cellIds
+//             console.log('cellIds are', cellIds);
+//             // // Query available drivers
+//             // nearbyDrivers = await Location.find({
+//             //     cellId: { $in: cellIds },
+//             //     // available: true,
+//             // })
+//             //     .limit(2)
+//             //     .lean();
+
+//             // if (nearbyDrivers.length >= 15) break; // Stop if enough drivers are found
+
+
+//             for (let i = 0; i < cellIds.length; i += BATCH_SIZE) {
+//                 const batch = cellIds.slice(i, i + BATCH_SIZE);
+
+//                 const drivers = await Location.find({ cellId: { $in: batch } }).limit(2).lean();
+//                 nearbyDrivers.push(...drivers);
+
+//                 if (nearbyDrivers.length >= 15) break; // Stop if enough drivers are found
+//             }
+//         }
+
+//         console.log('nearbyDrivers', nearbyDrivers);
+//         // return nearbyDrivers;
+
+//         await Promise.all([
+//             ...nearbyDrivers.map(userId => emitNewMessage("newTrip", userId, trip)),
+//             ...nearbyDrivers.map(userId => TripNotification.create({ trip, user: userId }))
+//         ]);
+
+
+//         return res.status(200).json({ success: true, message: 'Bidding started successfully' });
+//     }
+
+//     return res.status(400).json({ success: false, message: 'Bidding not started', trip });
+
+// })
+
+const getNearbyCellIds = (lat, lng, level, expandFactor, matchLevel = 13) => {
+    const neighborCache = new Map(); // Cache for neighbors
+
+    let allCells = new Set([S2.latLngToKey(lat, lng, level)]); // Start with the base cell
+
     for (let i = 0; i < expandFactor; i++) {
-        const neighbors = allCells.flatMap((c) => S2.getNeighbors(S2.keyToCellId(c)));
-        allCells = [...new Set([...allCells, ...neighbors.map(S2.cellIdToKey)])]; // Remove duplicates
+        let newCells = new Set();
+
+        // for (let cellKey of allCells) {
+        //     const neighbors = S2.latLngToNeighborKeys(
+        //         S2.keyToLatLng(cellKey).lat,
+        //         S2.keyToLatLng(cellKey).lng,
+        //         level
+        //     );
+
+        //     newCells = new Set([...newCells, ...neighbors]);
+        // }
+
+        for (let cellKey of allCells) {
+            if (!neighborCache.has(cellKey)) {
+                // Compute neighbors if not cached
+                const neighbors = S2.latLngToNeighborKeys(
+                    S2.keyToLatLng(cellKey).lat,
+                    S2.keyToLatLng(cellKey).lng,
+                    level
+                );
+                neighborCache.set(cellKey, neighbors); // Store in cache
+            }
+
+            newCells = new Set([...newCells, ...neighborCache.get(cellKey)]);
+        }
+
+        allCells = new Set([...allCells, ...newCells]); // Merge sets to remove duplicates
     }
 
-    return allCells;
+    // // Ensure matching level by converting cells to parent Level 13
+    // if (level > matchLevel) {
+    //     const getParentCell = (cellId, matchLevel) => {
+    //         const parentCellId = S2.S2CellId.fromToken(cellId).parent(matchLevel);
+    //         return parentCellId.toToken();
+    //     };
+
+    //     return Array.from(allCells).map(cellId => getParentCell(cellId, matchLevel));
+    // }
+
+    if (level > matchLevel) {
+        const getParentCell = (cellId, matchLevel) => {
+            const cellIdNum = S2.keyToId(cellId); // Convert key to numeric ID
+            if (!cellIdNum) return null; // Handle invalid conversion
+
+            const parentCell = S2.idToKey(cellIdNum, matchLevel); // Get parent cell at matchLevel
+            return parentCell;
+        };
+
+        return Array.from(allCells).map(cellId => getParentCell(cellId, matchLevel)).filter(Boolean);
+    }
+
+    return Array.from(allCells);
 };
+
+
+// const handleStartBidding = asyncHandler(async (req, res) => {
+//     const { tripId } = req.params;
+//     const trip = await Trip.findById(tripId);
+
+//     if (!trip) {
+//         throw new ApiError(400, 'Trip not found!');
+//     }
+
+//     trip.biddingStatus = 'inProgress';
+//     trip.biddingStartTime = new Date();
+//     await trip.save();
+
+//     const data = await getCoordinatesFromPincode(trip.from);
+
+//     if (data.latitude && data.longitude) {
+//         const BATCH_SIZE = 500;
+//         let nearbyDrivers = new Set();
+//         let checkedCellIds = new Set();
+//         const searchRadii = [2, 5, 8];
+//         const level = 13;
+
+//         for (const radius of searchRadii) {
+//             const expandFactor = Math.ceil(radius / 1.1);
+//             const cellIds = getNearbyCellIds(data.latitude, data.longitude, level, expandFactor);
+//             console.log(`${radius} has cellIds:`, cellIds);
+//             // Remove already checked cellIds
+//             const newCellIds = cellIds.filter(cellId => !checkedCellIds.has(cellId));
+
+//             // Update the checkedCellIds set
+//             newCellIds.forEach(cellId => checkedCellIds.add(cellId));
+
+//             for (let i = 0; i < newCellIds.length; i += BATCH_SIZE) {
+//                 const batch = newCellIds.slice(i, i + BATCH_SIZE);
+
+//                 const drivers = await Location.find({ cellId: { $in: batch } }).limit(2).lean();
+//                 drivers.forEach(driver => nearbyDrivers.add(driver));
+
+//                 if (nearbyDrivers.size >= 15) break;
+//             }
+
+//             if (nearbyDrivers.size >= 15) break;
+//         }
+
+//         console.log('nearbyDrivers', Array.from(nearbyDrivers));
+
+//         await Promise.all([
+//             ...Array.from(nearbyDrivers).map(userId => emitNewMessage("newTrip", userId, trip)),
+//             ...Array.from(nearbyDrivers).map(nearbyDriver => TripNotification.create({ trip, user: nearbyDriver.userId }))
+//         ]);
+
+//         return res.status(200).json({ success: true, message: 'Bidding started successfully' });
+//     }
+
+//     return res.status(400).json({ success: false, message: 'Bidding not started', trip });
+// });
+
 
 const handleStartBidding = asyncHandler(async (req, res) => {
     const { tripId } = req.params;
@@ -371,77 +591,61 @@ const handleStartBidding = asyncHandler(async (req, res) => {
 
     trip.biddingStatus = 'inProgress';
     trip.biddingStartTime = new Date();
-
     await trip.save();
 
     const data = await getCoordinatesFromPincode(trip.from);
 
+    const vehicles = await Location.find({}, { cellId: 1, userId: 1, _id: 0 }).lean();
+    const vehicleCellSet = new Set(vehicles.map(v => v.cellId));
+    const vehicleUserMap = new Map(vehicles.map(v => [v.cellId, v.userId]));
+    // const vehicleCellSet = new Set(await Location.distinct('cellId'));
+    // console.log('vehicleCellSet', vehicleCellSet);
+
     if (data.latitude && data.longitude) {
+        const BATCH_SIZE = 500;
+        let nearbyDrivers = new Set();
+        let checkedCellIds = new Set();
+        const searchLevels = [13, 14, 15, 16, 17]; // Start broad, then refine
+        const searchRadii = [10, 20, 50, 100]; // Expand radius gradually
 
+        for (const level of searchLevels) {
+            for (const radius of searchRadii) {
+                if (nearbyDrivers.size >= 5) break;
 
-        // const nearbyVehicles = await Vehicle.find({
-        //     location: {
-        //         $near: {
-        //             $geometry: {
-        //                 type: "Point",
-        //                 coordinates: [data.latitude, data.longitude], //  Latitude, Longitude
-        //             },
-        //             $maxDistance: 10000000, // 10 kilometers
-        //         },
-        //     },
-        // })
-        //     .populate("driver", "fullName phoneNumber") // Populate specific fields from the User model
-        //     .populate("owner", "fullName email"); // Populate specific fields from the User model
+                const expandFactor = Math.ceil(radius / 3);
+                const cellIds = getNearbyCellIds(data.latitude, data.longitude, level, expandFactor);
 
-        // // console.log('nearbyVehicles : ', nearbyVehicles);
+                const newCellIds = cellIds.filter(cellId => !checkedCellIds.has(cellId));
+                newCellIds.forEach(cellId => checkedCellIds.add(cellId));
 
-        // const userIds = nearbyVehicles.reduce((acc, value) => {
-        //     if (value.owner && value.owner._id) {
-        //         acc.push(value.owner._id); // Add owner ID to the accumulator
-        //     }
+                for (let i = 0; i < newCellIds.length; i += BATCH_SIZE) {
+                    const searchCells = newCellIds.slice(i, i + BATCH_SIZE);
+                    const matchedCells = [...searchCells].filter(cell => vehicleCellSet.has(cell));
+                    // const drivers = await Location.find({ cellId: { $in: batch } }).limit(10).lean();
+                    matchedCells.forEach(cellId => nearbyDrivers.add(vehicleUserMap.get(cellId)));
 
-        //     if (value.driver && value.driver._id) {
-        //         acc.push(value.driver._id); // Add driver ID to the accumulator
-        //     }
-
-        //     return acc; // Return the updated accumulator
-        // }, []); // Initialize accumulator as an empty array
-
-        // console.log(userIds);
-
-        let nearbyDrivers = [];
-        const searchRadii = [5, 10, 20, 40, 50, 100]; // Radius in km
-        const level = 16; // We are storing cellId at level 16
-
-        for (const radius of searchRadii) {
-            const expandFactor = Math.ceil(radius / 1.1); // Convert km to number of S2 cells to check
-            const cellIds = getNearbyCellIds(data.latitude, data.longitude, level, expandFactor); // Get nearby cellIds
-
-            // Query available drivers
-            nearbyDrivers = await Location.find({
-                cellId: { $in: cellIds },
-                available: true,
-            })
-                .limit(15)
-                .lean();
-
-            if (nearbyDrivers.length >= 15) break; // Stop if enough drivers are found
+                    if (nearbyDrivers.size >= 5) break;
+                }
+            }
         }
 
-        // return nearbyDrivers;
+        console.log('Found nearby drivers:', Array.from(nearbyDrivers));
 
         await Promise.all([
-            ...nearbyDrivers.map(userId => emitNewMessage("newTrip", userId, trip)),
-            ...nearbyDrivers.map(userId => TripNotification.create({ trip, user: userId }))
+            ...Array.from(nearbyDrivers).map(userId => emitNewMessage("newTrip", userId, trip)),
+            ...Array.from(nearbyDrivers).map(userId => TripNotification.create({ trip, user: userId }))
         ]);
 
+        if(!nearbyDrivers.length){
+            return res.status(400).json({ success: false, message: 'Start your bid again' });
+        }
 
         return res.status(200).json({ success: true, message: 'Bidding started successfully' });
     }
 
     return res.status(400).json({ success: false, message: 'Bidding not started', trip });
+});
 
-})
 
 const getCoordinatesFromPincode = async (pincode) => {
     const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${pincode}&key=${process.env.GOOGLE_MAPS_API_KEY}`;

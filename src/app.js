@@ -4,7 +4,7 @@ import cookieParser from "cookie-parser";
 import userRouter from './routes/user.routes.js';
 import vehicleRoutes from "./routes/vehicle.routes.js";
 import walletRoutes from "./routes/wallet.routes.js";
-import { getLocation } from "../utils/location.js";
+import { getLocation, getDistance } from "../utils/location.js";
 import tripRouter from "./routes/trip.route.js";
 import { createServer } from 'http';
 import { configureSocket } from './webSocket.js';
@@ -41,6 +41,7 @@ app.get("/api/getkey", (req, res) =>
 );
 
 app.post("/api/location", getLocation);
+app.get('/api/distance', getDistance);
 
 app.get("/api/googleApiKey", (req, res) =>
     res.status(200).json(process.env.GOOGLE_MAPS_API_KEY)

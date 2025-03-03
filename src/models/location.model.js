@@ -11,4 +11,6 @@ const LocationSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+LocationSchema.index({ cellId: 1 });
+
 export const Location = mongoose.model("Location", LocationSchema);
