@@ -103,7 +103,7 @@ const userSchema = new Schema(
             enum: ["male", "female", "other"],
             required: function () { return ["transporter", "driver"].includes(this.type); },
         },
-
+        
         otp: {
             type: Number,
         },

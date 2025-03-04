@@ -6,10 +6,11 @@ import {
     getVehicleByNumber,
     // getAllVehicles,
     updateVehicleLocation,
-    getVehicleById
+    addGoodsRecieve,
+    addBillReceipt,
+    getVehicleById,
 } from "../controllers/vehicle.controller.js";
 import { upload } from "../middlewares/multer.middleware.js";
-
 
 const router = express.Router();
 
@@ -23,7 +24,22 @@ router.post(
     ]),
     addVehicle
 );
+router.post(
+    "/create1",
+    upload.fields([
+        { name: 'GR', maxCount: 1 },
+    ]),
+    addGoodsRecieve
+);
+router.post(
+    "/create2",
+    upload.fields([
+        { name: 'BILL', maxCount: 1 },
+    ]),
+    addBillReceipt
+);
 router.get("/owner/:ownerId", getVehiclesByOwnerId);
+router.get("/vehicle/:vehicleId", getVehicleById);
 router.put("/update/:vehicleNumber", updateVehicleByNumber);
 router.get("/:vehicleNumber", getVehicleByNumber);
 // router.get("/all", getAllVehicles);

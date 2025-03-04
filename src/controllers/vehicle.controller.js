@@ -1,12 +1,13 @@
-
 import { Vehicle } from "../models/vehicle.model.js";
 import { User } from "../models/user.model.js";
+import { GoodsReceipt } from "../models/GoodsReceipt.js";
+import { BillReceipt } from "../models/BillReceipt.js";
 import { uploadToS3 } from "./user.controller.js";
+import { Trip } from "../models/trip.js";
 import mongoose from "mongoose";
 import { drivingLicenceVerification } from "../../utils/drivingLicenceVerification.js";
 import { verifyAadharAndPAN } from "./user.controller.js";
 import { validateFields } from "./user.controller.js";
-
 
 // Function to upload all files to S3
 const uploadFilesToS3 = async (files) => {
@@ -28,121 +29,198 @@ const uploadFilesToS3 = async (files) => {
     }
   }
 
-  return uploadedFiles; // Return all uploaded file URLs
+  return uploadedFiles; 
 };
 
-// const uploadFilesToS3 = async (files) => {
-//   const uploadPromises = []; // Array to hold all upload promises
-//   const uploadedFiles = {}; // To store S3 URLs with field names
 
-//   for (const [fieldName, fileArray] of Object.entries(files)) {
-//     uploadedFiles[fieldName] = [];
+export const addGoodsRecieve = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-//     for (const file of fileArray) {
-//       const { buffer, originalname, mimetype } = file;
+  try {
+    const { vehicleNumber, driverId, currentLocation } = req.body;
 
-//       // Create a promise for each upload and store it
-//       const uploadPromise = uploadToS3(buffer, originalname, mimetype)
-//         .then((s3Url) => {
-//           uploadedFiles[fieldName].push(s3Url); // Add URL to respective field
-//         });
+    if (!vehicleNumber || !driverId) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
 
-//       uploadPromises.push(uploadPromise);
-//     }
-//   }
+    const parsedCurrentLocation =
+      typeof currentLocation === "string" ? JSON.parse(currentLocation) : currentLocation;
 
-//   // Wait for all uploads to complete
-//   await Promise.all(uploadPromises);
+    const driverObjectId = new mongoose.Types.ObjectId(driverId);
+    const driver = await User.findById(driverObjectId).session(session);
 
-//   return uploadedFiles; // Return the URLs for all uploaded files
-// };
+    if (!driver) {
+      throw new Error("Driver not found");
+    }
+
+    if (!req.files) {
+      throw new Error("No files uploaded");
+    }
+
+    const uploadedFiles = await uploadFilesToS3(req.files);
+
+    const goodsReceiptData = {
+      vehicleNumber,
+      grFiles: uploadedFiles["GR"]?.map((file) => file) || [],
+      driver: driver._id,
+      location: parsedCurrentLocation
+        ? {
+            type: "Point",
+            coordinates: [parsedCurrentLocation.longitude, parsedCurrentLocation.latitude],
+          }
+        : undefined,
+    };
+
+    // Create GoodsReceipt Record
+    const goodsReceipt = await GoodsReceipt.create([goodsReceiptData], { session });
+
+    // Debugging: Check Trip Exists Before Updating
+    const existingTrip = await Trip.findOne({
+      bidder: driverObjectId,
+      status: "inProgress",
+    }).session(session);
+
+    if (!existingTrip) {
+      throw new Error(`No active trip found for bidder (driverId): ${driverObjectId}`);
+    }
+
+    console.log("Trip found before update:", existingTrip);
+
+    // **Ensure bidder ID matches the driver ID**
+    console.log("Driver ID from request:", driverId);
+    console.log("Bidder ID from trip schema:", existingTrip.bidder.toString());
+
+    if (existingTrip.bidder.toString() !== driverId) {
+      throw new Error("Driver ID and Trip Bidder ID do not match!");
+    }
+
+    // Update Trip to Set grAccepted: true
+    const updatedTrip = await Trip.findOneAndUpdate(
+      { _id: existingTrip._id },
+      { $set: { grAccepted: true } },
+      { session, new: true }
+    );
+
+    if (!updatedTrip) {
+      throw new Error(`Failed to update trip for bidder (driverId): ${driverObjectId}`);
+    }
+
+    console.log("Updated Trip:", updatedTrip);
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return res.status(201).json({
+      message: "GR added successfully and trip updated",
+      goodsReceipt: goodsReceipt[0],
+      trip: updatedTrip,
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+
+    console.error("Error adding GR:", error.message);
+    return res.status(400).json({ message: error.message || "Server error" });
+  }
+};
 
 
-// Add Vehicle Controller
-// export const addVehicle = async (req, res) => {
-//   try {
-//     const {
-//       vehicleNumber,
-//       vehicleHeight,
-//       vehicleWidth,
-//       vehicleLength,
-//       ownerId,
-//       driverFullName,
-//       driverEmail,
-//       driverPhoneNumber,
-//       driverAadharNumber,
-//       driverPanNumber,
-//       driverDlNumber,
-//       driverDob,
-//       driverGender,
-//     } = req.body;
+export const addBillReceipt = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-//     // Check required fields
-//     if (!vehicleNumber || !vehicleHeight || !vehicleWidth || !vehicleLength || !ownerId) {
-//       return res.status(400).json({ message: "Missing required fields" });
-//     }
+  try {
+    const { vehicleNumber, driverId, currentLocation } = req.body;
 
-//     // Validate owner
-//     const owner = await User.findById(ownerId);
-//     console.log('ower : ', owner)
-//     if (!owner) {
-//       return res.status(404).json({ message: "Owner not found" });
-//     }
+    if (!vehicleNumber || !driverId) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
 
-//     // Upload files
-//     const uploadedFiles = await uploadFilesToS3(req.files);
+    // Parse and validate location
+    let parsedCurrentLocation = null;
+    try {
+      parsedCurrentLocation =
+        typeof currentLocation === "string" ? JSON.parse(currentLocation) : currentLocation;
+    } catch (error) {
+      return res.status(400).json({ message: "Invalid location format" });
+    }
 
-//     // Create vehicle
-//     const vehicleData = {
-//       vehicleNumber,
-//       rcCopy: uploadedFiles["rcCopy"].map(r => r),
-//       height: vehicleHeight,
-//       width: vehicleWidth,
-//       length: vehicleLength,
-//       owner,
-//       latitude: 24,
-//       longitude: 24,
-//       tdsDeclaration: uploadedFiles["tdsDeclaration"].map(r => r),
-//       ownerConsent: uploadedFiles["ownerConsent"].map(r => r),
-//     };
+    if (!parsedCurrentLocation || !parsedCurrentLocation.longitude || !parsedCurrentLocation.latitude) {
+      return res.status(400).json({ message: "Invalid location data" });
+    }
 
-//     const vehicle = await Vehicle.create(vehicleData);
+    // Check if driver exists
+    const driverObjectId = new mongoose.Types.ObjectId(driverId);
+    const driver = await User.findById(driverObjectId).session(session);
+    if (!driver) {
+      return res.status(404).json({ message: "Driver not found" });
+    }
 
-//     const parsedDriverDob = driverDob ? JSON.parse(driverDob) : null;
-//     console.log(typeof new Date(parsedDriverDob), parsedDriverDob, 'driver dob', new Date(parsedDriverDob));
+    // Handle file uploads
+    if (!req.files) {
+      return res.status(400).json({ message: "No files uploaded" });
+    }
 
-//     // Create driver (parallel task)
-//     const driverData = {
-//       fullName: driverFullName,
-//       email: driverEmail,
-//       phoneNumber: driverPhoneNumber,
-//       aadharNumber: driverAadharNumber,
-//       panNumber: driverPanNumber,
-//       dlNumber: driverDlNumber,
-//       dob: new Date(parsedDriverDob),
-//       gender: driverGender,
-//       profileImage: uploadedFiles["driverProfileImage"]?.[0] || "",
-//       type: "driver",
-//       vehicle,
-//     };
+    const uploadedFiles = await uploadFilesToS3(req.files);
+    const billFiles = uploadedFiles["BILL"]?.map((file) => file) || [];
 
-//     const driverPromise = User.create(driverData);
+    // Create Bill Receipt data
+    const billReceiptData = {
+      vehicleNumber,
+      billFiles,
+      driver: driver._id,
+      location: {
+        type: "Point",
+        coordinates: [parsedCurrentLocation.longitude, parsedCurrentLocation.latitude],
+      },
+    };
 
-//     // Update vehicle with driver (run parallel with driver creation)
-//     const vehicleUpdatePromise = Vehicle.findByIdAndUpdate(
-//       vehicle._id,
-//       { driver: (await driverPromise)._id }, // Wait only here for the driver result
-//       { new: true }
-//     );
+    // Save Bill Receipt
+    const billReceipt = await BillReceipt.create([billReceiptData], { session });
 
-//     await Promise.all([driverPromise, vehicleUpdatePromise]);
+    // Check for active trip
+    const existingTrip = await Trip.findOne({
+      bidder: driverObjectId,
+      status: "inProgress",
+    }).session(session);
 
-//     return res.status(201).json({ message: "Vehicle added successfully" });
-//   } catch (error) {
-//     console.error("Error adding vehicle:", error.message);
-//     return res.status(400).json({ message: error.message || "Server error" });
-//   }
-// };
+    if (!existingTrip) {
+      return res.status(404).json({ message: `No active trip found for driverId: ${driverId}` });
+    }
+
+    // Ensure driver is the bidder
+    if (existingTrip.bidder.toString() !== driverId) {
+      return res.status(400).json({ message: "Driver ID and Trip Bidder ID do not match!" });
+    }
+
+    // Update trip to set billAccepted: true
+    const updatedTrip = await Trip.findOneAndUpdate(
+      { _id: existingTrip._id },
+      { $set: { billAccepted: true } },
+      { session, new: true }
+    );
+
+    if (!updatedTrip) {
+      return res.status(500).json({ message: `Failed to update trip for driverId: ${driverId}` });
+    }
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return res.status(201).json({
+      message: "Bill Receipt added successfully and trip updated",
+      billReceipt: billReceipt[0],
+      trip: updatedTrip,
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+
+    console.error("Error adding Bill Receipt:", error.message);
+    return res.status(500).json({ message: error.message || "Server error" });
+  }
+};
 
 export const addVehicle = async (req, res) => {
   const session = await mongoose.startSession();
@@ -256,6 +334,32 @@ export const addVehicle = async (req, res) => {
 
     console.error("Error adding vehicle:", error.message);
     return res.status(400).json({ message: error.message || "Server error" });
+  }
+};
+
+
+export const getVehicleById = async (req, res) => {
+  try {
+    const { vehicleId } = req.params;
+
+    if (!vehicleId) {
+      return res.status(400).json({ message: "Vehicle ID is required" });
+    }
+
+    const vehicle = await Vehicle.findById(vehicleId)
+      .populate("owner", "fullName email phoneNumber")
+      .populate("broker", "fullName email phoneNumber")
+      .populate("driver", "fullName email phoneNumber aadharNumber panNumber dlNumber dob gender profileImage")
+      .exec();
+
+    if (!vehicle) {
+      return res.status(404).json({ message: "Vehicle not found" });
+    }
+
+    return res.status(200).json(vehicle);
+  } catch (error) {
+    console.error("Error fetching vehicle details:", error);
+    return res.status(500).json({ message: "Server error" });
   }
 };
 

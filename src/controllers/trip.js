@@ -9,7 +9,7 @@ import cron from 'node-cron';
 import crypto from "crypto";
 import mongoose from "mongoose";
 import Wallet from "../models/wallet.model.js";
-import { Trip } from "../models/trip.js"; // Assuming Trip is imported from its model
+import { Trip } from "../models/trip.js"; 
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { S2 } from "s2-geometry";
@@ -65,10 +65,13 @@ const paymentVerificationForTrip = asyncHandler(async (req, res) => {
             throw new ApiError(400, "Final price is not set for this trip.");
         }
 
+        const paymentPercent = (amount / trip.finalPrice) * 100;
+
         // Add transaction without modifying the finalPrice
         await Transactions.create({
             user,
             trip,
+            paymentPercent,
             amount: Number(amount),
             type: "credit",
             razorpay_order_id,
@@ -96,83 +99,6 @@ const paymentVerificationForTrip = asyncHandler(async (req, res) => {
     }
 });
 
-
-// const paymentVerificationForTrip = asyncHandler(async (req, res) => {
-//     const { userId, tripId, amount, razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
-
-//     // Validate required fields
-//     if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
-//       throw new ApiError(400, "Invalid or missing userId.");
-//     }
-//     if (!amount || isNaN(amount) || Number(amount) <= 0) {
-//       throw new ApiError(400, "Invalid amount. Please provide a positive number.");
-//     }
-//     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-//       throw new ApiError(400, "Missing required payment fields: orderId, paymentId, signature.");
-//     }
-
-//     try {
-//       // Generate and compare signatures
-//       const body = `${razorpay_order_id}|${razorpay_payment_id}`;
-//       const expectedSignature = crypto
-//         .createHmac("sha256", process.env.RAZORPAY_API_SECRET)
-//         .update(body)
-//         .digest("hex");
-
-//       if (razorpay_signature !== expectedSignature) {
-//         console.error("Invalid payment signature", { razorpay_payment_id, expectedSignature });
-//         throw new ApiError(400, "Invalid payment signature.");
-//       }
-
-//       // Find the Trip document
-//       console.log(`Searching for trip with ID: ${tripId}`);
-//       const trip = await Trip.findById(tripId);
-
-//       if (!trip) {
-//         console.error(`Trip not found for tripId: ${tripId}`);
-//         throw new ApiError(404, "Trip not found.");
-//       }
-
-//       // Check if finalPrice exists
-//       if (!trip.finalPrice || trip.finalPrice <= 0) {
-//         throw new ApiError(400, "Final price is not set for this trip.");
-//       }
-
-//       // Deduct the amount from finalPrice
-//       trip.finalPrice -= Number(amount);
-
-//       // Prevent negative finalPrice
-//       if (trip.finalPrice < 0) {
-//         console.error("Payment amount exceeds final price.");
-//         throw new ApiError(400, "Payment amount exceeds the remaining final price.");
-//       }
-
-//       // Add transaction
-//       trip.transactions.push({
-//         amount: Number(amount),
-//         type: "credit",
-//         razorpay_order_id,
-//         razorpay_payment_id,
-//         razorpay_signature,
-//       });
-
-//       // Save the updated Trip document
-//       await trip.save();
-
-//       return res.status(200).json({
-//         success: true,
-//         message: "Payment verified, trip transaction updated, and final price adjusted successfully.",
-//         transactions: trip.transactions,
-//         remainingFinalPrice: trip.finalPrice,
-//       });
-//     } catch (error) {
-//       console.error("Error during payment verification:", error);
-//       throw new ApiError(
-//         error.statusCode || 500,
-//         error.message || "Internal server error during payment verification."
-//       );
-//     }
-//   });
 
 const getDistance = asyncHandler(async (req, res) => {
     const { to, from } = req.query;

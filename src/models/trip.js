@@ -14,12 +14,10 @@ const tripSchema = new Schema({
         type: String,
         required: true,
     },
-
     tripDate: {
         type: Date,
         required: true
     },
-
     cargoDetails: {
         type: {
             cargoType: {
@@ -29,25 +27,25 @@ const tripSchema = new Schema({
             quotePrice: {
                 type: Number,
                 required: true,
-                min: 0, // Ensure positive values
+                min: 0, 
             },
             reducedQuotePrice: { type: Number },
             payloadWeight: {
                 type: Number,
-                required: true, // in tonnes
-                min: 0, // Ensure positive values
+                required: true, 
+                min: 0, 
             },
             payloadHeight: {
                 type: Number,
-                required: false, // in feet
+                required: false, 
             },
             payloadLength: {
                 type: Number,
-                required: false, // in feet
+                required: false, 
             },
             payloadWidth: {
                 type: Number,
-                required: false, // in feet
+                required: false, 
             },
         },
         required: true,
@@ -81,23 +79,23 @@ const tripSchema = new Schema({
             },
         }
     ],
-    // Track the sequence of bids
     bids: [
         {
-            price: { type: Number, required: true }, // Bid amount
+            price: { type: Number, required: true }, 
             increasedPrice: { type: Number },
             reducedPrice: { type: Number },
-            user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }, // Who made the bid
-            role: { type: String, enum: ["consumer", "driver"], required: true }, // Role of the bidder
-            timestamp: { type: Date, default: Date.now }, // When the bid was made
+            user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+            role: { type: String, enum: ["consumer", "driver"], required: true },
+            timestamp: { type: Date, default: Date.now }, 
         },
     ],
-
     // Final agreed price and related details
     finalPrice: {
         type: Number,
-        required: false, // Set when the bidding process is complete
+        required: false, 
     },
+    grAccepted: { type: Boolean, default: false },
+    billAccepted: { type: Boolean, default: false },
 
     // Status of the bidding process
     biddingStatus: {
@@ -142,7 +140,6 @@ tripSchema.pre("save", function (next) {
 
     next();
 });
-
 
 tripSchema.index({ tripDate: 1 });
 

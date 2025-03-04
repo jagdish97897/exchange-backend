@@ -131,6 +131,7 @@ const configureSocket = (server) => {
     return io;
 };
 
+
 // Utility function to emit a new message
 const emitNewMessage = async (event, userId, trip) => {
     if (!io) {
