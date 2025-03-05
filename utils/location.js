@@ -2,45 +2,6 @@ import 'dotenv/config';
 import axios from 'axios';
 import { S2 } from 's2-geometry';
 
-
-export const getZoneFromGooglePlaces = async (latitude, longitude) => {
-    const apiKey = process.env.GOOGLE_API_KEY || "AIzaSyAI0jFdBsZoRP00RGq050nfe24aSfj1mwo";
-    const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${apiKey}`;
-  
-    try {
-      const response = await axios.get(url);
-      const { results } = response.data;
-  
-      if (results && results.length > 0) {
-        let state = null;
-        let country = null;
-  
-        // Loop through address components to find state and country
-        for (const component of results[0].address_components) {
-          if (component.types.includes("administrative_area_level_1")) {
-            state = component.long_name; // State (Zone)
-          }
-          if (component.types.includes("country")) {
-            country = component.short_name; // Country Code (IN for India)
-          }
-        }
-  
-        // Ensure the location is in India before returning the zone (state)
-        if (country === "IN" && state) {
-          return state;
-        } else {
-          return "Outside India";
-        }
-      }
-  
-      console.warn("No results found for latlng:", latitude, longitude);
-      return "Unknown";
-    } catch (error) {
-      console.error("Error in reverse geocoding:", error);
-      return "Unknown";
-    }
-  };
-
 const getLocation = async (req, res) => {
     const { fromPin, toPin } = req.body;
 

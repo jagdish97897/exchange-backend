@@ -29,7 +29,7 @@ const uploadFilesToS3 = async (files) => {
     }
   }
 
-  return uploadedFiles; 
+  return uploadedFiles;
 };
 
 
@@ -66,9 +66,9 @@ export const addGoodsRecieve = async (req, res) => {
       driver: driver._id,
       location: parsedCurrentLocation
         ? {
-            type: "Point",
-            coordinates: [parsedCurrentLocation.longitude, parsedCurrentLocation.latitude],
-          }
+          type: "Point",
+          coordinates: [parsedCurrentLocation.longitude, parsedCurrentLocation.latitude],
+        }
         : undefined,
     };
 
@@ -336,33 +336,6 @@ export const addVehicle = async (req, res) => {
     return res.status(400).json({ message: error.message || "Server error" });
   }
 };
-
-
-export const getVehicleById = async (req, res) => {
-  try {
-    const { vehicleId } = req.params;
-
-    if (!vehicleId) {
-      return res.status(400).json({ message: "Vehicle ID is required" });
-    }
-
-    const vehicle = await Vehicle.findById(vehicleId)
-      .populate("owner", "fullName email phoneNumber")
-      .populate("broker", "fullName email phoneNumber")
-      .populate("driver", "fullName email phoneNumber aadharNumber panNumber dlNumber dob gender profileImage")
-      .exec();
-
-    if (!vehicle) {
-      return res.status(404).json({ message: "Vehicle not found" });
-    }
-
-    return res.status(200).json(vehicle);
-  } catch (error) {
-    console.error("Error fetching vehicle details:", error);
-    return res.status(500).json({ message: "Server error" });
-  }
-};
-
 
 
 // Get Vehicles by Owner ID Controller
