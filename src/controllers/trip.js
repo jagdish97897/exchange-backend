@@ -9,7 +9,7 @@ import cron from 'node-cron';
 import crypto from "crypto";
 import mongoose from "mongoose";
 import Wallet from "../models/wallet.model.js";
-import { Trip } from "../models/trip.js"; 
+import { Trip } from "../models/trip.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { S2 } from "s2-geometry";
@@ -350,24 +350,35 @@ const getAllTrips = asyncHandler(async (req, res) => {
         },
         {
             $lookup: {
-                from: "trips", // Assuming your Trip collection is named "trips"
+                from: mongoose.model("Trip").collection.name, // Correct collection reference
                 localField: "trip",
                 foreignField: "_id",
-                as: "trip"
+                as: "tripsData"
             }
         },
         {
-            $unwind: "$trip"
+            $unwind: "$tripsData"
         },
         {
             $match: {
-                "trip.biddingStatus": "inProgress",
+                "tripsData.biddingStatus": "inProgress",
                 $expr: {
                     $lt: [
                         new Date(),
-                        { $add: ["$trip.biddingStartTime", 1000 * 60 * 30] } // Add 30 minutes
-                    ]
-                }
+                        {
+                            $add: [
+                                { $toDate: "$tripsData.biddingStartTime" },
+                                1000 * 60 * 30,
+                            ],
+                        },
+                    ],
+                },
+            }
+        },
+        {
+            $project: {
+                "tripsData": 1,
+                _id: 0,
             }
         }
     ]);
@@ -375,6 +386,8 @@ const getAllTrips = asyncHandler(async (req, res) => {
     if (!trips || trips.length === 0) {
         return res.status(400).json({ message: "No trips found" });
     }
+
+    // console.log('Trips: ', trips);
     return res.status(200).json({ trips, message: 'Trip details found successfully', bidAccepted: false });
 });
 
