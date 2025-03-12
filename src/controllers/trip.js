@@ -615,6 +615,54 @@ const changeTripStatus = async () => {
 
 };
 
+const ownerTrips = async (req, res) => {
+    const { ownerId } = req.params;
+
+    console.log('owId', ownerId);
+
+    try {
+        const trips = await Trip.aggregate([
+            {
+                $match: { status: "inProgress" } // Only consider "progress" trips
+            },
+            {
+                $sort: { createdAt: -1 } // Sort trips by date (latest first)
+            },
+            {
+                $group: {
+                    _id: "$bidder",
+                    latestTrip: { $first: "$$ROOT" } // Get the latest trip for each driver
+                }
+            },
+            {
+                $lookup: {
+                    from: "vehicles",
+                    localField: "_id", // _id (driver) from the grouped result
+                    foreignField: "driver", // Match with Vehicle's driver field
+                    as: "vehicle"
+                }
+            },
+            {
+                $unwind: {
+                    path: "$vehicle",
+                    preserveNullAndEmptyArrays: true
+                }
+            },
+            {
+                $match: { "vehicle.owner": new mongoose.Types.ObjectId(ownerId) } // Filter vehicles by ownerId
+            },
+            {
+                $replaceRoot: { newRoot: "$latestTrip" } // Return clean latest trip data
+            }
+        ]);
+
+        res.json(trips);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+
 cron.schedule('* * * * *', async (params) => {
     try {
         const response = await changeTripStatus();
@@ -625,5 +673,4 @@ cron.schedule('* * * * *', async (params) => {
 })
 
 
-
-export { createTrip, getTripDetails, getAllTrips, getCustomerAllTrips, createTripPayment, updateTripStatus, getDistance, updateCounterPrice, updateRevisedPrice, getBidPrice, getCounterPrice, acceptOrRejectBidRequest, updateTrip, handleStartBidding, getAcceptedBidTrips, changeTripStatus, paymentVerificationForTrip };
+export { createTrip, getTripDetails, getAllTrips, getCustomerAllTrips, createTripPayment, updateTripStatus, getDistance, updateCounterPrice, updateRevisedPrice, getBidPrice, getCounterPrice, acceptOrRejectBidRequest, updateTrip, handleStartBidding, getAcceptedBidTrips, changeTripStatus, paymentVerificationForTrip, ownerTrips };

@@ -417,16 +417,16 @@ const sendOtpOnEmail = asyncHandler(async (req, res) => {
 })
 
 const sendLoginOtp = asyncHandler(async (req, res) => {
-    const { phoneNumber, type } = req.body;
+    const { phoneNumber } = req.body;
 
-    console.log(phoneNumber, type);
+    // console.log(phoneNumber, type);
 
     if (!phoneNumber || isNaN(Number(phoneNumber))) {
         throw new ApiError(400, "Please enter a valid phone number.");
     }
 
     // console.log(type)
-    const user = await User.findOne({ phoneNumber, type: { $in: type ? type : [] }, });
+    const user = await User.findOne({ phoneNumber });
     // console.log(user);
     if (!user) {
         throw new ApiError(404, "User with this phone number does not exist.");
