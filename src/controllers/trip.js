@@ -79,7 +79,18 @@ const paymentVerificationForTrip = asyncHandler(async (req, res) => {
             razorpay_signature,
         });
 
-        trip.status = "inProgress";
+        const transactions = await Transactions.find({ trip });
+
+        const totalAmountPaid = transactions.reduce((acc, transaction) => {
+            acc = acc + transaction.amount;
+            return acc;
+        }, 0);
+
+        if (totalAmountPaid === trip.finalPrice) {
+            trip.status = "completed";
+        } else {
+            trip.status = "inProgress";
+        }
 
         // Save the updated Trip document
         await trip.save();
@@ -218,7 +229,17 @@ const handleStartBidding = asyncHandler(async (req, res) => {
     if (!latitude || !longitude) return res.status(400).json({ success: false, message: 'Bidding not started' });
 
     const vehicles = await Location.find({}, { cellId: 1, userId: 1, _id: 0 }).lean();
-    const vehicleCellMap = new Map(vehicles.map(({ cellId, userId }) => [cellId, userId]));
+    // const vehicleCellMap = new Map(vehicles.map(({ cellId, userId }) => [cellId, userId]));
+
+    const vehicleCellMap = new Map();
+
+    vehicles.forEach(({ cellId, userId }) => {
+        if (!vehicleCellMap.has(cellId)) {
+            vehicleCellMap.set(cellId, []);
+        }
+        vehicleCellMap.get(cellId).push(userId);
+    });
+
 
     const nearbyDrivers = findNearbyDrivers(latitude, longitude, vehicleCellMap);
     if (!nearbyDrivers.length) return res.status(400).json({ success: false, message: 'Start your bid again' });
@@ -233,7 +254,7 @@ const handleStartBidding = asyncHandler(async (req, res) => {
 
 const findNearbyDrivers = (lat, lng, vehicleCellMap) => {
     const searchLevels = [13, 14, 15, 16, 17];
-    const searchRadii = [10, 20, 50, 100];
+    const searchRadii = [10, 20, 30];
     const BATCH_SIZE = 500;
 
     let nearbyDrivers = new Set();
@@ -243,12 +264,28 @@ const findNearbyDrivers = (lat, lng, vehicleCellMap) => {
         for (const radius of searchRadii) {
             if (nearbyDrivers.size >= 5) return Array.from(nearbyDrivers);
 
-            const expandFactor = Math.ceil(radius / 3);
-            const newCellIds = getNearbyCellIds(lat, lng, level, expandFactor).filter(cellId => !checkedCellIds.has(cellId));
+            const BASE_EXPAND_FACTOR = 8;
+
+            const getExpandFactor = (level, radius) => {
+                const expandFactors = {
+                    13: { 10: 8, 20: 16, 30: 24, 40: 32, 50: 40 },
+                    14: { 2: 5 },
+                    15: { 1: 4 },
+                    16: { 1: 8 },
+                    17: { 1: 16 }
+                };
+                return expandFactors[level][radius] || 8; // Default to 8 if undefined
+            };
+
+
+            // const expandFactor = Math.ceil(radius / 3);
+            const newCellIds = getNearbyCellIds(lat, lng, level, getExpandFactor(level, radius)).filter(cellId => !checkedCellIds.has(cellId));
+
             newCellIds.forEach(cellId => checkedCellIds.add(cellId));
 
             for (let i = 0; i < newCellIds.length; i += BATCH_SIZE) {
-                const matchedDrivers = newCellIds.slice(i, i + BATCH_SIZE).map(cell => vehicleCellMap.get(cell)).filter(Boolean);
+                const matchedDrivers = newCellIds.slice(i, i + BATCH_SIZE).flatMap(cell => vehicleCellMap.get(cell)).filter(Boolean);
+
                 matchedDrivers.forEach(driver => nearbyDrivers.add(driver));
 
                 if (nearbyDrivers.size >= 5) return Array.from(nearbyDrivers);
@@ -276,9 +313,11 @@ const getNearbyCellIds = (lat, lng, level, expandFactor, matchLevel = 13) => {
         });
         allCells = new Set([...allCells, ...newCells]);
     }
-    return level > matchLevel
+    const cellsIds = level > matchLevel
         ? Array.from(allCells).map(cellId => S2.idToKey(S2.keyToId(cellId), matchLevel)).filter(Boolean)
         : Array.from(allCells);
+
+    return cellsIds;
 };
 
 const getCoordinatesFromPincode = async (pincode) => {
@@ -319,11 +358,14 @@ const updateTripStatus = asyncHandler(async (req, res) => {
 const getTripDetails = asyncHandler(async (req, res) => {
     const { tripId } = req.params;
     validateFields([tripId]);
-    const trip = await Trip.findById(tripId)
-        .populate("counterPriceList.user", "fullName phoneNumber");
+    const [trip, transactions] = await Promise.all([
+        Trip.findById(tripId)
+            .populate("counterPriceList.user", "fullName phoneNumber"),
+        Transactions.find({ trip: tripId })
+    ]);
     // .populate("revisedPrice.vspUser", "fullName phoneNumber");
 
-    return res.status(200).json({ trip, message: 'Trip details found successfully' })
+    return res.status(200).json({ trip:{...trip,transactions}, message: 'Trip details found successfully' })
 });
 
 const getCustomerAllTrips = asyncHandler(async (req, res) => {
