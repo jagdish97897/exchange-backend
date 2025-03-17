@@ -355,18 +355,47 @@ const updateTripStatus = asyncHandler(async (req, res) => {
     return res.status(200).json({ trip, message: 'Trip status updated successfully' })
 });
 
+// const getTripDetails = asyncHandler(async (req, res) => {
+//     const { tripId } = req.params;
+//     validateFields([tripId]);
+//     const [trip, transactions] = await Promise.all([
+//         Trip.findById(tripId)
+//             .populate("counterPriceList.user", "fullName phoneNumber"),
+//         Transactions.find({ trip: tripId })
+//     ]);
+//     // .populate("revisedPrice.vspUser", "fullName phoneNumber");
+
+//     return res.status(200).json({ trip:{...trip,transactions}, message: 'Trip details found successfully' })
+// });
+
 const getTripDetails = asyncHandler(async (req, res) => {
     const { tripId } = req.params;
-    validateFields([tripId]);
+
+    // Validate tripId presence
+    if (!tripId) {
+        return res.status(400).json({ message: "Trip ID is required" });
+    }
+
+    // Fetch Trip & Transactions in parallel with optimization
     const [trip, transactions] = await Promise.all([
         Trip.findById(tripId)
-            .populate("counterPriceList.user", "fullName phoneNumber"),
-        Transactions.find({ trip: tripId })
+            .populate("counterPriceList.user", "fullName phoneNumber")
+            .lean(), // Converts to plain JSON for performance boost
+        Transactions.find({ trip: tripId }).select("-__v -updatedAt").lean() // Exclude unnecessary fields
     ]);
-    // .populate("revisedPrice.vspUser", "fullName phoneNumber");
 
-    return res.status(200).json({ trip:{...trip,transactions}, message: 'Trip details found successfully' })
+    // If trip not found, return 404
+    if (!trip) {
+        return res.status(404).json({ message: "Trip not found" });
+    }
+
+    return res.status(200).json({
+        trip,
+        transactions,
+        message: "Trip details found successfully",
+    });
 });
+
 
 const getCustomerAllTrips = asyncHandler(async (req, res) => {
     const { userId } = req.params;
