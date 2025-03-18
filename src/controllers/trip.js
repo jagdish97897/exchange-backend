@@ -243,11 +243,19 @@ const handleStartBidding = asyncHandler(async (req, res) => {
 
 
     const nearbyDrivers = findNearbyDrivers(latitude, longitude, vehicleCellMap);
+
     if (!nearbyDrivers.length) return res.status(400).json({ success: false, message: 'Start your bid again' });
 
+    const owners = await Vehicle.distinct("owner", { driver: { $in: nearbyDrivers } });
+
+    // console.log('nearbyDrivers', nearbyDrivers);
+    // console.log('owners', owners);
+
+    const allBidders = Array.from(new Set([...nearbyDrivers, ...owners]));
+
     await Promise.all([
-        ...nearbyDrivers.map(userId => emitNewMessage("newTrip", userId, trip)),
-        ...nearbyDrivers.map(userId => TripNotification.create({ trip, user: userId }))
+        ...allBidders.map(userId => emitNewMessage("newTrip", userId, trip)),
+        ...allBidders.map(userId => TripNotification.create({ trip, user: userId }))
     ]);
 
     return res.status(200).json({ success: true, message: 'Bidding started successfully', trip });
@@ -393,36 +401,36 @@ const getCustomerAllTrips = asyncHandler(async (req, res) => {
     // const trips = await Trip.find({ user: userId });
     const trips = await Trip.aggregate([
         {
-          $match: { user: new mongoose.Types.ObjectId(userId) } // Filter trips by userId
+            $match: { user: new mongoose.Types.ObjectId(userId) } // Filter trips by userId
         },
         {
-          $lookup: {
-            from: "transactions", // Name of the transaction collection
-            localField: "_id", // Field in the Trip collection
-            foreignField: "trip", // Field in the Transaction collection that links to Trip
-            as: "transactions"
-          }
+            $lookup: {
+                from: "transactions", // Name of the transaction collection
+                localField: "_id", // Field in the Trip collection
+                foreignField: "trip", // Field in the Transaction collection that links to Trip
+                as: "transactions"
+            }
         },
         {
-          $unwind: {
-            path: "$transactions",
-            preserveNullAndEmptyArrays: true // Ensure trips without transactions are not dropped
-          }
+            $unwind: {
+                path: "$transactions",
+                preserveNullAndEmptyArrays: true // Ensure trips without transactions are not dropped
+            }
         },
         {
-          $group: {
-            _id: "$_id", // Group by trip ID
-            tripDetails: { $first: "$$ROOT" }, // Store trip details once
-            transactions: { $push: "$transactions" } // Collect all transactions for the trip
-          }
+            $group: {
+                _id: "$_id", // Group by trip ID
+                tripDetails: { $first: "$$ROOT" }, // Store trip details once
+                transactions: { $push: "$transactions" } // Collect all transactions for the trip
+            }
         },
         {
             $unset: "tripDetails.transactions" // Removes transactions from tripDetails
-        }        
-      ]);
-      
-      console.log("trips", trips);
-      
+        }
+    ]);
+
+    console.log("trips", trips);
+
     return res.status(200).json({ trips, message: 'Trip details found successfully' })
 });
 
@@ -647,15 +655,19 @@ const acceptOrRejectBidRequest = asyncHandler(async (req, res) => {
     if (!trip.bidder) {
         trip.bidder = vspUser;
     }
-    
-    console.log('finalPrice', trip.bids[trip.bids.length - 1].lastBidPrice);
+
+    const finalBid = trip.bids[trip.bids.length - 1].toObject();
+    // console.log('finalBid', finalBid);
+    // console.log('lastBidPrice', finalBid.increasedPrice);
+
 
     // Check if the driver exists in the lastbidder array using phoneNumber
     const lastBidPrice = trip.bids.length > 0 ?
-        trip.bids[trip.bids.length - 1].lastBidPrice
+        finalBid.increasedPrice
         :
         trip.counterPriceList.find(list => list.user.toString() === vspUserId).increasedCounterPrice;
-        console.log(lastBidPrice)
+
+    console.log('lastBidPrice :', lastBidPrice);
 
     // Update the trip status and preserve the lastbidder data
     trip.status = status;
@@ -712,26 +724,23 @@ const changeTripStatus = async () => {
 const ownerTrips = async (req, res) => {
     const { ownerId } = req.params;
 
-    console.log('owId', ownerId);
+    // console.log('owId', ownerId);
 
     try {
         const trips = await Trip.aggregate([
-            {
-                $match: { status: "inProgress" } // Only consider "progress" trips
-            },
             {
                 $sort: { createdAt: -1 } // Sort trips by date (latest first)
             },
             {
                 $group: {
-                    _id: "$bidder",
-                    latestTrip: { $first: "$$ROOT" } // Get the latest trip for each driver
+                    _id: { bidder: "$bidder", status: "$status" }, // Group by bidder and status
+                    latestTrip: { $first: "$$ROOT" } // Get the latest trip for each driver & status
                 }
             },
             {
                 $lookup: {
                     from: "vehicles",
-                    localField: "_id", // _id (driver) from the grouped result
+                    localField: "_id.bidder", // Match bidder from grouped results
                     foreignField: "driver", // Match with Vehicle's driver field
                     as: "vehicle"
                 }
@@ -750,6 +759,7 @@ const ownerTrips = async (req, res) => {
             }
         ]);
 
+
         res.json(trips);
     } catch (error) {
         console.error(error);
@@ -760,77 +770,77 @@ const ownerTrips = async (req, res) => {
 
 export const getAcceptedGRImages = async (req, res) => {
     try {
-      const { tripId } = req.params;
-  
-      if (!tripId) {
-        return res.status(400).json({ success: false, message: "Trip ID is required" });
-      }
-  
-      // Find the trip and ensure grAccepted is true
-      const trip = await Trip.findOne({ _id: tripId, grAccepted: true }).select("bidder");
-      if (!trip) {
-        return res.status(404).json({ success: false, message: "No trip found or GR not accepted" });
-      }
-      console.log("Trip Bidder (Driver ID):", trip.bidder); // Debugging
-  
-      // Fetch GoodsReceipt using the bidder ID (driver)
-      const goodsReceipts = await GoodsReceipt.find({ driver: trip.bidder }).select("grFiles vehicleNumber driver");
-  
-      console.log("Goods Receipts:", goodsReceipts); 
-  
-      if (!goodsReceipts.length) {
-        return res.status(404).json({ success: false, message: "No Goods Receipt found for this driver" });
-      }
-  
-      // Extract data
-      const imageData = goodsReceipts.map(gr => ({
-        vehicleNumber: gr.vehicleNumber,
-        driver: gr.driver,
-        images: gr.grFiles,
-      }));
-  
-      res.status(200).json({ success: true, data: imageData });
+        const { tripId } = req.params;
+
+        if (!tripId) {
+            return res.status(400).json({ success: false, message: "Trip ID is required" });
+        }
+
+        // Find the trip and ensure grAccepted is true
+        const trip = await Trip.findOne({ _id: tripId, grAccepted: true }).select("bidder");
+        if (!trip) {
+            return res.status(404).json({ success: false, message: "No trip found or GR not accepted" });
+        }
+        console.log("Trip Bidder (Driver ID):", trip.bidder); // Debugging
+
+        // Fetch GoodsReceipt using the bidder ID (driver)
+        const goodsReceipts = await GoodsReceipt.find({ driver: trip.bidder }).select("grFiles vehicleNumber driver");
+
+        console.log("Goods Receipts:", goodsReceipts);
+
+        if (!goodsReceipts.length) {
+            return res.status(404).json({ success: false, message: "No Goods Receipt found for this driver" });
+        }
+
+        // Extract data
+        const imageData = goodsReceipts.map(gr => ({
+            vehicleNumber: gr.vehicleNumber,
+            driver: gr.driver,
+            images: gr.grFiles,
+        }));
+
+        res.status(200).json({ success: true, data: imageData });
     } catch (error) {
-      res.status(500).json({ success: false, message: "Server Error", error: error.message });
+        res.status(500).json({ success: false, message: "Server Error", error: error.message });
     }
-  };
-  
+};
+
 export const getAcceptedBillImages = async (req, res) => {
     try {
-      const { tripId } = req.params;
-  
-      if (!tripId) {
-        return res.status(400).json({ success: false, message: "Trip ID is required" });
-      }
-  
-      // Find the trip and ensure grAccepted is true
-      const trip = await Trip.findOne({ _id: tripId, billAccepted: true }).select("bidder");
-      if (!trip) {
-        return res.status(404).json({ success: false, message: "No trip found or bill not accepted" });
-      }
-      console.log("Trip Bidder (Driver ID):", trip.bidder); // Debugging
-  
-      // Fetch GoodsReceipt using the bidder ID (driver)
-      const billReceipts = await BillReceipt.find({ driver: trip.bidder }).select("billFiles vehicleNumber driver");
-  
-      console.log("Goods Receipts:", billReceipts); // Debugging
-  
-      if (!billReceipts.length) {
-        return res.status(404).json({ success: false, message: "No bill reciept found for this driver" });
-      }
-  
-      // Extract data
-      const imageData = billReceipts.map(bill => ({
-        vehicleNumber: bill.vehicleNumber,
-        driver: bill.driver,
-        images: bill.billFiles,
-      }));
-  
-      res.status(200).json({ success: true, data: imageData });
+        const { tripId } = req.params;
+
+        if (!tripId) {
+            return res.status(400).json({ success: false, message: "Trip ID is required" });
+        }
+
+        // Find the trip and ensure grAccepted is true
+        const trip = await Trip.findOne({ _id: tripId, billAccepted: true }).select("bidder");
+        if (!trip) {
+            return res.status(404).json({ success: false, message: "No trip found or bill not accepted" });
+        }
+        console.log("Trip Bidder (Driver ID):", trip.bidder); // Debugging
+
+        // Fetch GoodsReceipt using the bidder ID (driver)
+        const billReceipts = await BillReceipt.find({ driver: trip.bidder }).select("billFiles vehicleNumber driver");
+
+        console.log("Goods Receipts:", billReceipts); // Debugging
+
+        if (!billReceipts.length) {
+            return res.status(404).json({ success: false, message: "No bill reciept found for this driver" });
+        }
+
+        // Extract data
+        const imageData = billReceipts.map(bill => ({
+            vehicleNumber: bill.vehicleNumber,
+            driver: bill.driver,
+            images: bill.billFiles,
+        }));
+
+        res.status(200).json({ success: true, data: imageData });
     } catch (error) {
-      res.status(500).json({ success: false, message: "Server Error", error: error.message });
+        res.status(500).json({ success: false, message: "Server Error", error: error.message });
     }
-  };
+};
 
 cron.schedule('* * * * *', async (params) => {
     try {
