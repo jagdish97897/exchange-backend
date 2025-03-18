@@ -4,6 +4,7 @@ const BillReceiptSchema = new mongoose.Schema({
   vehicleNumber: { type: String, required: true },
   billFiles: { type: [String], default: [] },
   driver: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+  tripId: { type: mongoose.Schema.Types.ObjectId, ref: "Trip", required: true },
   location: {
     type: { type: String, enum: ["Point"], default: "Point" },
     coordinates: { type: [Number] } 

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createTrip, getTripDetails, getAllTrips, getCustomerAllTrips, createTripPayment, updateTripStatus, getDistance, updateCounterPrice, updateRevisedPrice, getCounterPrice, getBidPrice, acceptOrRejectBidRequest, updateTrip, handleStartBidding, getAcceptedBidTrips, paymentVerificationForTrip, ownerTrips } from "../controllers/trip.js";
+import { createTrip, getTripDetails, getAllTrips, getCustomerAllTrips, createTripPayment, updateTripStatus, getDistance, updateCounterPrice, updateRevisedPrice, getCounterPrice, getBidPrice, acceptOrRejectBidRequest, updateTrip, handleStartBidding, getAcceptedBidTrips, paymentVerificationForTrip, ownerTrips, getAcceptedGRImages,getAcceptedBillImages } from "../controllers/trip.js";
 
 
 const router = Router();
@@ -21,5 +21,9 @@ router.route("/:tripId/startBidding").post(handleStartBidding);
 router.route("/:userId/acceptedBidTrips").get(getAcceptedBidTrips);
 router.post("/paymentVerificationForTrip", paymentVerificationForTrip);
 router.get("/owner/:ownerId/progressTrip", ownerTrips);
+
+
+router.get("/gracceptedimage/:tripId", getAcceptedGRImages);
+router.get("/billacceptedimage/:tripId", getAcceptedBillImages);
 
 export default router;

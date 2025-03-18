@@ -33,6 +33,98 @@ const uploadFilesToS3 = async (files) => {
 };
 
 
+// export const addGoodsRecieve = async (req, res) => {
+//   const session = await mongoose.startSession();
+//   session.startTransaction();
+
+//   try {
+//     const { vehicleNumber, driverId, currentLocation } = req.body;
+
+//     if (!vehicleNumber || !driverId) {
+//       return res.status(400).json({ message: "Missing required fields" });
+//     }
+
+//     const parsedCurrentLocation =
+//       typeof currentLocation === "string" ? JSON.parse(currentLocation) : currentLocation;
+
+//     const driverObjectId = new mongoose.Types.ObjectId(driverId);
+//     const driver = await User.findById(driverObjectId).session(session);
+
+//     if (!driver) {
+//       throw new Error("Driver not found");
+//     }
+
+//     if (!req.files) {
+//       throw new Error("No files uploaded");
+//     }
+
+//     const uploadedFiles = await uploadFilesToS3(req.files);
+
+//     const goodsReceiptData = {
+//       vehicleNumber,
+//       grFiles: uploadedFiles["GR"]?.map((file) => file) || [],
+//       driver: driver._id,
+//       location: parsedCurrentLocation
+//         ? {
+//             type: "Point",
+//             coordinates: [parsedCurrentLocation.longitude, parsedCurrentLocation.latitude],
+//           }
+//         : undefined,
+//     };
+
+//     // Create GoodsReceipt Record
+//     const goodsReceipt = await GoodsReceipt.create([goodsReceiptData], { session });
+
+//     // Debugging: Check Trip Exists Before Updating
+//     const existingTrip = await Trip.findOne({
+//       bidder: driverObjectId,
+//       status: "inProgress",
+//     }).session(session);
+
+//     if (!existingTrip) {
+//       throw new Error(`No active trip found for bidder (driverId): ${driverObjectId}`);
+//     }
+
+//     console.log("Trip found before update:", existingTrip);
+
+//     // **Ensure bidder ID matches the driver ID**
+//     console.log("Driver ID from request:", driverId);
+//     console.log("Bidder ID from trip schema:", existingTrip.bidder.toString());
+
+//     if (existingTrip.bidder.toString() !== driverId) {
+//       throw new Error("Driver ID and Trip Bidder ID do not match!");
+//     }
+
+//     // Update Trip to Set grAccepted: true
+//     const updatedTrip = await Trip.findOneAndUpdate(
+//       { _id: existingTrip._id },
+//       { $set: { grAccepted: true } },
+//       { session, new: true }
+//     );
+
+//     if (!updatedTrip) {
+//       throw new Error(`Failed to update trip for bidder (driverId): ${driverObjectId}`);
+//     }
+
+//     console.log("Updated Trip:", updatedTrip);
+
+//     await session.commitTransaction();
+//     session.endSession();
+
+//     return res.status(201).json({
+//       message: "GR added successfully and trip updated",
+//       goodsReceipt: goodsReceipt[0],
+//       trip: updatedTrip,
+//     });
+//   } catch (error) {
+//     await session.abortTransaction();
+//     session.endSession();
+
+//     console.error("Error adding GR:", error.message);
+//     return res.status(400).json({ message: error.message || "Server error" });
+//   }
+// };
+
 export const addGoodsRecieve = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -60,22 +152,7 @@ export const addGoodsRecieve = async (req, res) => {
 
     const uploadedFiles = await uploadFilesToS3(req.files);
 
-    const goodsReceiptData = {
-      vehicleNumber,
-      grFiles: uploadedFiles["GR"]?.map((file) => file) || [],
-      driver: driver._id,
-      location: parsedCurrentLocation
-        ? {
-          type: "Point",
-          coordinates: [parsedCurrentLocation.longitude, parsedCurrentLocation.latitude],
-        }
-        : undefined,
-    };
-
-    // Create GoodsReceipt Record
-    const goodsReceipt = await GoodsReceipt.create([goodsReceiptData], { session });
-
-    // Debugging: Check Trip Exists Before Updating
+    // **Find the active trip for the driver**
     const existingTrip = await Trip.findOne({
       bidder: driverObjectId,
       status: "inProgress",
@@ -87,13 +164,25 @@ export const addGoodsRecieve = async (req, res) => {
 
     console.log("Trip found before update:", existingTrip);
 
-    // **Ensure bidder ID matches the driver ID**
-    console.log("Driver ID from request:", driverId);
-    console.log("Bidder ID from trip schema:", existingTrip.bidder.toString());
-
     if (existingTrip.bidder.toString() !== driverId) {
       throw new Error("Driver ID and Trip Bidder ID do not match!");
     }
+
+    const goodsReceiptData = {
+      tripId: existingTrip._id, // Add tripId here
+      vehicleNumber,
+      grFiles: uploadedFiles["GR"]?.map((file) => file) || [],
+      driver: driver._id,
+      location: parsedCurrentLocation
+        ? {
+            type: "Point",
+            coordinates: [parsedCurrentLocation.longitude, parsedCurrentLocation.latitude],
+          }
+        : undefined,
+    };
+
+    // Create GoodsReceipt Record
+    const goodsReceipt = await GoodsReceipt.create([goodsReceiptData], { session });
 
     // Update Trip to Set grAccepted: true
     const updatedTrip = await Trip.findOneAndUpdate(
@@ -125,6 +214,102 @@ export const addGoodsRecieve = async (req, res) => {
   }
 };
 
+
+// export const addBillReceipt = async (req, res) => {
+//   const session = await mongoose.startSession();
+//   session.startTransaction();
+
+//   try {
+//     const { vehicleNumber, driverId, currentLocation } = req.body;
+
+//     if (!vehicleNumber || !driverId) {
+//       return res.status(400).json({ message: "Missing required fields" });
+//     }
+
+//     // Parse and validate location
+//     let parsedCurrentLocation = null;
+//     try {
+//       parsedCurrentLocation =
+//         typeof currentLocation === "string" ? JSON.parse(currentLocation) : currentLocation;
+//     } catch (error) {
+//       return res.status(400).json({ message: "Invalid location format" });
+//     }
+
+//     if (!parsedCurrentLocation || !parsedCurrentLocation.longitude || !parsedCurrentLocation.latitude) {
+//       return res.status(400).json({ message: "Invalid location data" });
+//     }
+
+//     // Check if driver exists
+//     const driverObjectId = new mongoose.Types.ObjectId(driverId);
+//     const driver = await User.findById(driverObjectId).session(session);
+//     if (!driver) {
+//       return res.status(404).json({ message: "Driver not found" });
+//     }
+
+//     // Handle file uploads
+//     if (!req.files) {
+//       return res.status(400).json({ message: "No files uploaded" });
+//     }
+
+//     const uploadedFiles = await uploadFilesToS3(req.files);
+//     const billFiles = uploadedFiles["BILL"]?.map((file) => file) || [];
+
+//     // Create Bill Receipt data
+//     const billReceiptData = {
+//       vehicleNumber,
+//       billFiles,
+//       driver: driver._id,
+//       location: {
+//         type: "Point",
+//         coordinates: [parsedCurrentLocation.longitude, parsedCurrentLocation.latitude],
+//       },
+//     };
+
+//     // Save Bill Receipt
+//     const billReceipt = await BillReceipt.create([billReceiptData], { session });
+
+//     // Check for active trip
+//     const existingTrip = await Trip.findOne({
+//       bidder: driverObjectId,
+//       status: "inProgress",
+//     }).session(session);
+
+//     if (!existingTrip) {
+//       return res.status(404).json({ message: `No active trip found for driverId: ${driverId}` });
+//     }
+
+//     // Ensure driver is the bidder
+//     if (existingTrip.bidder.toString() !== driverId) {
+//       return res.status(400).json({ message: "Driver ID and Trip Bidder ID do not match!" });
+//     }
+
+//     // Update trip to set billAccepted: true
+//     const updatedTrip = await Trip.findOneAndUpdate(
+//       { _id: existingTrip._id },
+//       { $set: { billAccepted: true } },
+//       { session, new: true }
+//     );
+
+//     if (!updatedTrip) {
+//       return res.status(500).json({ message: `Failed to update trip for driverId: ${driverId}` });
+//     }
+
+//     await session.commitTransaction();
+//     session.endSession();
+
+//     return res.status(201).json({
+//       message: "Bill Receipt added successfully and trip updated",
+//       billReceipt: billReceipt[0],
+//       trip: updatedTrip,
+//     });
+//   } catch (error) {
+//     await session.abortTransaction();
+//     session.endSession();
+
+//     console.error("Error adding Bill Receipt:", error.message);
+//     return res.status(500).json({ message: error.message || "Server error" });
+//   }
+// };
 
 export const addBillReceipt = async (req, res) => {
   const session = await mongoose.startSession();
@@ -165,20 +350,6 @@ export const addBillReceipt = async (req, res) => {
     const uploadedFiles = await uploadFilesToS3(req.files);
     const billFiles = uploadedFiles["BILL"]?.map((file) => file) || [];
 
-    // Create Bill Receipt data
-    const billReceiptData = {
-      vehicleNumber,
-      billFiles,
-      driver: driver._id,
-      location: {
-        type: "Point",
-        coordinates: [parsedCurrentLocation.longitude, parsedCurrentLocation.latitude],
-      },
-    };
-
-    // Save Bill Receipt
-    const billReceipt = await BillReceipt.create([billReceiptData], { session });
-
     // Check for active trip
     const existingTrip = await Trip.findOne({
       bidder: driverObjectId,
@@ -193,6 +364,21 @@ export const addBillReceipt = async (req, res) => {
     if (existingTrip.bidder.toString() !== driverId) {
       return res.status(400).json({ message: "Driver ID and Trip Bidder ID do not match!" });
     }
+
+    // Create Bill Receipt data including tripId
+    const billReceiptData = {
+      vehicleNumber,
+      billFiles,
+      driver: driver._id,
+      tripId: existingTrip._id, // ✅ Added tripId reference
+      location: {
+        type: "Point",
+        coordinates: [parsedCurrentLocation.longitude, parsedCurrentLocation.latitude],
+      },
+    };
+
+    // Save Bill Receipt
+    const billReceipt = await BillReceipt.create([billReceiptData], { session });
 
     // Update trip to set billAccepted: true
     const updatedTrip = await Trip.findOneAndUpdate(
@@ -221,6 +407,8 @@ export const addBillReceipt = async (req, res) => {
     return res.status(500).json({ message: error.message || "Server error" });
   }
 };
+
+
 
 export const addVehicle = async (req, res) => {
   const session = await mongoose.startSession();
@@ -473,3 +661,4 @@ export const getVehicleById = async (req, res) => {
     return res.status(500).json({ message: "Server error" });
   }
 };
+

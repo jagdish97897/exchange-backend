@@ -24,12 +24,12 @@ async function fetchNewULIPToken() {
 }
 // 
 // Schedule a cron job to update the ULIP token every hour
-cron.schedule('* * * * *', async () => {
-    try {
-        ulipToken = await fetchNewULIPToken();
-    } catch (error) {
-        console.log('Error updating ULIP token:', error);
-    }
-});
+// cron.schedule('* * * * *', async () => {
+//     try {
+//         ulipToken = await fetchNewULIPToken();
+//     } catch (error) {
+//         console.log('Error updating ULIP token:', error);
+//     }
+// });
 
 export { ulipToken };

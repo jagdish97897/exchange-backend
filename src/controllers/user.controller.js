@@ -325,7 +325,7 @@ const register = asyncHandler(async (req, res) => {
                 case 'consumer':
                     validateFields([fullName, phoneNumber, email, gstin, companyName, website]);
                     //verify GST
-                    await gstVerification(gstin);
+                    // await gstVerification(gstin);
                     Object.assign(userData, { gstin, companyName, website });
                     break;
 

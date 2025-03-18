@@ -15,6 +15,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { S2 } from "s2-geometry";
 import { Location } from "../models/location.model.js";
 import { Transactions } from "../models/transaction.model.js";
+import { GoodsReceipt } from "../models/GoodsReceipt.js";
 import { TripNotification } from "../models/trip_notification.model.js";
 
 
@@ -355,18 +356,6 @@ const updateTripStatus = asyncHandler(async (req, res) => {
     return res.status(200).json({ trip, message: 'Trip status updated successfully' })
 });
 
-// const getTripDetails = asyncHandler(async (req, res) => {
-//     const { tripId } = req.params;
-//     validateFields([tripId]);
-//     const [trip, transactions] = await Promise.all([
-//         Trip.findById(tripId)
-//             .populate("counterPriceList.user", "fullName phoneNumber"),
-//         Transactions.find({ trip: tripId })
-//     ]);
-//     // .populate("revisedPrice.vspUser", "fullName phoneNumber");
-
-//     return res.status(200).json({ trip:{...trip,transactions}, message: 'Trip details found successfully' })
-// });
 
 const getTripDetails = asyncHandler(async (req, res) => {
     const { tripId } = req.params;
@@ -401,8 +390,39 @@ const getCustomerAllTrips = asyncHandler(async (req, res) => {
     const { userId } = req.params;
 
     validateFields([userId]);
-    const trips = await Trip.find({ user: userId });
-
+    // const trips = await Trip.find({ user: userId });
+    const trips = await Trip.aggregate([
+        {
+          $match: { user: new mongoose.Types.ObjectId(userId) } // Filter trips by userId
+        },
+        {
+          $lookup: {
+            from: "transactions", // Name of the transaction collection
+            localField: "_id", // Field in the Trip collection
+            foreignField: "trip", // Field in the Transaction collection that links to Trip
+            as: "transactions"
+          }
+        },
+        {
+          $unwind: {
+            path: "$transactions",
+            preserveNullAndEmptyArrays: true // Ensure trips without transactions are not dropped
+          }
+        },
+        {
+          $group: {
+            _id: "$_id", // Group by trip ID
+            tripDetails: { $first: "$$ROOT" }, // Store trip details once
+            transactions: { $push: "$transactions" } // Collect all transactions for the trip
+          }
+        },
+        {
+            $unset: "tripDetails.transactions" // Removes transactions from tripDetails
+        }        
+      ]);
+      
+      console.log("trips", trips);
+      
     return res.status(200).json({ trips, message: 'Trip details found successfully' })
 });
 
@@ -627,12 +647,15 @@ const acceptOrRejectBidRequest = asyncHandler(async (req, res) => {
     if (!trip.bidder) {
         trip.bidder = vspUser;
     }
+    
+    console.log('finalPrice', trip.bids[trip.bids.length - 1].lastBidPrice);
 
     // Check if the driver exists in the lastbidder array using phoneNumber
-    const lastBidPrice = trip.bids.length ?
-        trip.bids[trip.bids.length - 1].price
+    const lastBidPrice = trip.bids.length > 0 ?
+        trip.bids[trip.bids.length - 1].lastBidPrice
         :
-        trip.counterPriceList.find(list => list.user.toString() === vspUserId).counterPrice;
+        trip.counterPriceList.find(list => list.user.toString() === vspUserId).increasedCounterPrice;
+        console.log(lastBidPrice)
 
     // Update the trip status and preserve the lastbidder data
     trip.status = status;
@@ -733,6 +756,81 @@ const ownerTrips = async (req, res) => {
         res.status(500).json({ error: "Internal Server Error" });
     }
 };
+
+
+export const getAcceptedGRImages = async (req, res) => {
+    try {
+      const { tripId } = req.params;
+  
+      if (!tripId) {
+        return res.status(400).json({ success: false, message: "Trip ID is required" });
+      }
+  
+      // Find the trip and ensure grAccepted is true
+      const trip = await Trip.findOne({ _id: tripId, grAccepted: true }).select("bidder");
+      if (!trip) {
+        return res.status(404).json({ success: false, message: "No trip found or GR not accepted" });
+      }
+      console.log("Trip Bidder (Driver ID):", trip.bidder); // Debugging
+  
+      // Fetch GoodsReceipt using the bidder ID (driver)
+      const goodsReceipts = await GoodsReceipt.find({ driver: trip.bidder }).select("grFiles vehicleNumber driver");
+  
+      console.log("Goods Receipts:", goodsReceipts); 
+  
+      if (!goodsReceipts.length) {
+        return res.status(404).json({ success: false, message: "No Goods Receipt found for this driver" });
+      }
+  
+      // Extract data
+      const imageData = goodsReceipts.map(gr => ({
+        vehicleNumber: gr.vehicleNumber,
+        driver: gr.driver,
+        images: gr.grFiles,
+      }));
+  
+      res.status(200).json({ success: true, data: imageData });
+    } catch (error) {
+      res.status(500).json({ success: false, message: "Server Error", error: error.message });
+    }
+  };
+  
+export const getAcceptedBillImages = async (req, res) => {
+    try {
+      const { tripId } = req.params;
+  
+      if (!tripId) {
+        return res.status(400).json({ success: false, message: "Trip ID is required" });
+      }
+  
+      // Find the trip and ensure grAccepted is true
+      const trip = await Trip.findOne({ _id: tripId, billAccepted: true }).select("bidder");
+      if (!trip) {
+        return res.status(404).json({ success: false, message: "No trip found or bill not accepted" });
+      }
+      console.log("Trip Bidder (Driver ID):", trip.bidder); // Debugging
+  
+      // Fetch GoodsReceipt using the bidder ID (driver)
+      const billReceipts = await BillReceipt.find({ driver: trip.bidder }).select("billFiles vehicleNumber driver");
+  
+      console.log("Goods Receipts:", billReceipts); // Debugging
+  
+      if (!billReceipts.length) {
+        return res.status(404).json({ success: false, message: "No bill reciept found for this driver" });
+      }
+  
+      // Extract data
+      const imageData = billReceipts.map(bill => ({
+        vehicleNumber: bill.vehicleNumber,
+        driver: bill.driver,
+        images: bill.billFiles,
+      }));
+  
+      res.status(200).json({ success: true, data: imageData });
+    } catch (error) {
+      res.status(500).json({ success: false, message: "Server Error", error: error.message });
+    }
+  };
 
 cron.schedule('* * * * *', async (params) => {
     try {
