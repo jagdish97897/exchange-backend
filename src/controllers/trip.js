@@ -90,9 +90,13 @@ const paymentVerificationForTrip = asyncHandler(async (req, res) => {
 
         if (totalAmountPaid === trip.finalPrice) {
             trip.status = "completed";
+            user.bidAccepted = false;
+            await user.save();
+
         } else {
             trip.status = "inProgress";
         }
+
 
         // Save the updated Trip document
         await trip.save();
