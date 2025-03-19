@@ -17,6 +17,7 @@ import { Location } from "../models/location.model.js";
 import { Transactions } from "../models/transaction.model.js";
 import { GoodsReceipt } from "../models/GoodsReceipt.js";
 import { TripNotification } from "../models/trip_notification.model.js";
+import { BillReceipt } from "../models/BillReceipt.js";
 
 
 
@@ -66,7 +67,7 @@ const paymentVerificationForTrip = asyncHandler(async (req, res) => {
             throw new ApiError(400, "Final price is not set for this trip.");
         }
 
-        const paymentPercent = (amount / trip.finalPrice) * 100;
+        const paymentPercent = Math.round(amount / trip.finalPrice * 100);
 
         // Add transaction without modifying the finalPrice
         await Transactions.create({
