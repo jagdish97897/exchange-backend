@@ -661,14 +661,14 @@ const acceptOrRejectBidRequest = asyncHandler(async (req, res) => {
         trip.bidder = vspUser;
     }
 
-    const finalBid = trip.bids[trip.bids.length - 1].toObject();
+    // const finalBid = trip.bids[trip.bids.length - 1].toObject();
     // console.log('finalBid', finalBid);
     // console.log('lastBidPrice', finalBid.increasedPrice);
 
 
     // Check if the driver exists in the lastbidder array using phoneNumber
     const lastBidPrice = trip.bids.length > 0 ?
-        finalBid.increasedPrice
+    (trip.bids[trip.bids.length - 1].toObject()).increasedPrice
         :
         trip.counterPriceList.find(list => list.user.toString() === vspUserId).increasedCounterPrice;
 
