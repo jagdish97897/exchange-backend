@@ -81,7 +81,7 @@ const paymentVerificationForTrip = asyncHandler(async (req, res) => {
             razorpay_signature,
         });
 
-        const transactions = await Transactions.find({ trip });
+        const [transactions, driver] = await Promise.all([Transactions.find({ trip })], User.findById({ _id: trip.bidder }));
 
         const totalAmountPaid = transactions.reduce((acc, transaction) => {
             acc = acc + transaction.amount;
@@ -90,8 +90,8 @@ const paymentVerificationForTrip = asyncHandler(async (req, res) => {
 
         if (totalAmountPaid === trip.finalPrice) {
             trip.status = "completed";
-            user.bidAccepted = false;
-            await user.save();
+            driver.bidAccepted = false;
+            await driver.save();
 
         } else {
             trip.status = "inProgress";
