@@ -90,8 +90,9 @@ const paymentVerificationForTrip = asyncHandler(async (req, res) => {
 
         if (totalAmountPaid === trip.finalPrice) {
             trip.status = "completed";
-            driver.bidAccepted = false;
-            await driver.save();
+            console.log('driver',driver)
+            // driver.bidAccepted = false;
+            // await driver.save();
 
         } else {
             trip.status = "inProgress";
